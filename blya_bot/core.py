@@ -9,7 +9,7 @@ from . import settings
 from .audio import convert_ogg_to_wav
 from .health import HealthCheckApp
 from .recognition import SpeechRecognizer
-from .word_count import WordCounter, build_keyword_tree, count_words_total
+from .word_count import WordCounter, count_words_total, keyword_tree_from_file
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Global state
@@ -19,7 +19,7 @@ bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher(bot)
 
 print("Creating bad words tree..")
-kwtree = build_keyword_tree(settings.BAD_WORDS_FILE)
+kwtree = keyword_tree_from_file(settings.BAD_WORDS_FILE)
 print("Bad words tree created")
 
 print("Loading model...")
