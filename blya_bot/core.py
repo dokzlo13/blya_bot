@@ -1,21 +1,26 @@
 import io
-import json
-import wave
-from collections import Counter
-from typing import Generator
 
-import emoji
-import pydub
+import emoji  # types: ignore
 import vosk
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils.executor import start_polling
 
 from . import settings
-from .tools import async_wrap_iter
+from .audio import convert_ogg_to_wav
 from .health import HealthCheckApp
+from .recognition import SpeechRecognizer
+from .word_count import WordCounter, build_keyword_tree, count_words_total
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Global state
+# TODO: better global state management
 
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher(bot)
+
+print("Creating bad words tree..")
+kwtree = build_keyword_tree(settings.BAD_WORDS_FILE)
+print("Bad words tree created")
 
 print("Loading model...")
 speech_model = vosk.Model(model_path=settings.VOSK_MODEL_PATH)
@@ -38,39 +43,6 @@ async def stop_health_check(*args):
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
-def recognize(wav_buf: io.IOBase) -> Generator[None, str, None]:
-    # Loading as wave to obtain framerate for recognizer
-    wf = wave.open(wav_buf, "rb")  # type: ignore
-
-    if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-        print("Audio file must be WAV format mono PCM.")
-
-    rec = vosk.KaldiRecognizer(speech_model, wf.getframerate())
-    # rec.SetWords(True)
-    # rec.SetPartialWords(True)
-    rec.SetNLSML(True)
-
-    while True:
-        data = wav_buf.read(4000)
-        if len(data) == 0:
-            break
-        if rec.AcceptWaveform(data):
-            yield json.loads(rec.Result())["text"]
-
-    yield json.loads(rec.FinalResult())["text"]
-
-
-def count_words(text, words) -> Counter:
-    counts = Counter({w: 0 for w in words})
-    for word in words:
-        counts[word] += text.count(word)
-    return counts
-
-
-def count_words_total(text) -> int:
-    return len(text.split())
-
-
 @dp.message_handler(content_types=types.ContentType.VOICE)
 async def handle_voice(message: types.Message):
     if message.voice.duration > settings.MY_NERVES_LIMIT:
@@ -81,35 +53,32 @@ async def handle_voice(message: types.Message):
     await message.voice.download(destination_file=ogg_buf)
     ogg_buf.seek(0)
 
-    # Converting audio file from "ogg" to "wav"
-    audio: pydub.AudioSegment = pydub.AudioSegment.from_ogg(ogg_buf)
-    audio = audio.set_channels(1)
-    audio = audio.set_sample_width(2)
-
-    wav_buf = io.BytesIO()
-    audio.export(format="wav", out_f=wav_buf)
-    wav_buf.seek(0)
+    wav_buf = await convert_ogg_to_wav(ogg_buf)
+    recognizer = SpeechRecognizer(speech_model)
 
     # Counting words
-    counts: Counter = Counter()
+    word_counter = WordCounter(kwtree)
     full_text = ""
-    async for text in async_wrap_iter(recognize(wav_buf)):
+    async for text in recognizer.recognize(wav_buf):
         full_text += text
-        counts += count_words(text, settings.COUNT_WORDS)
+        word_counter.feed(text)
 
-    counts = Counter({w: c for w, c in dict(counts).items() if c > 0})  # type: ignore
+    counts = word_counter.summary()
     if not len(counts):
         return
 
-    # Assembling answer
+    # Overall stats
     bad_words_total = sum(counts.values())
     words_total = count_words_total(full_text)
+    bad_words_percentage = (bad_words_total / words_total) * 100
+
+    # Assembling answer
     response_text = "<b><i>Cтатистика:</i></b>\n"
     for word, cnt in counts.items():
         response_text += f":sparkles: <b>{word}</b> - {cnt}\n"
     response_text += (
         f"\nВсего около <b>{bad_words_total}</b> матерных слов из <b>{words_total}</b> "
-        f"или <b>{(bad_words_total / words_total) * 100:.2f}%</b> :new_moon_face:"
+        f"или <b>{bad_words_percentage:.2f}%</b> :new_moon_face:"
     )
 
     await message.reply(emoji.emojize(response_text), parse_mode=types.ParseMode.HTML)

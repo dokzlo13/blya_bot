@@ -29,6 +29,7 @@ COPY pyproject.toml /app
 RUN poetry install --no-dev --no-root \
     && if [ "$ENVIRONMENT" = "development" ]; then poetry install; fi
 
+ADD fixtures /app/fixtures
 ADD blya_bot /app/blya_bot
 
 ENV PATH="/app:${PATH}"
