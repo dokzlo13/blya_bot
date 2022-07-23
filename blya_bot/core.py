@@ -1,6 +1,8 @@
 import io
+import logging
+from time import time
 
-import emoji  # types: ignore
+import emoji  # type: ignore
 import vosk
 from aiogram import Bot, Dispatcher, types
 from aiogram.utils.executor import start_polling
@@ -11,20 +13,25 @@ from .health import HealthCheckApp
 from .recognition import SpeechRecognizer
 from .word_count import WordCounter, count_words_total, keyword_tree_from_file
 
+# TODO: better logging
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+
+
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Global state
 # TODO: better global state management
 
+
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher(bot)
 
-print("Creating bad words tree..")
+logging.info("Creating bad words tree..")
 kwtree = keyword_tree_from_file(settings.BAD_WORDS_FILE)
-print("Bad words tree created")
+logging.info("Bad words tree created")
 
-print("Loading model...")
+logging.info("Loading model...")
 speech_model = vosk.Model(model_path=settings.VOSK_MODEL_PATH)
-print("Model loaded")
+logging.info("Model loaded")
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 # Health check app
@@ -48,6 +55,7 @@ async def handle_voice(message: types.Message):
     if message.voice.duration > settings.MY_NERVES_LIMIT:
         return await message.reply(settings.POLITE_RESPONSE)
 
+    start_time = time()
     # Downloading file. Yes, right in memory
     ogg_buf = io.BytesIO()
     await message.voice.download(destination_file=ogg_buf)
@@ -67,6 +75,7 @@ async def handle_voice(message: types.Message):
     if not len(counts):
         return
 
+    logging.info(f"Message transcripted, elapsed time: {time()-start_time:.4f}sec.")
     # Overall stats
     bad_words_total = sum(counts.values())
     words_total = count_words_total(full_text)

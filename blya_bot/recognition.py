@@ -1,5 +1,6 @@
 import io
 import json
+import logging
 import wave
 from typing import AsyncGenerator, Generator
 
@@ -17,7 +18,7 @@ class SpeechRecognizer:
         wf = wave.open(wav_buf, "rb")  # type: ignore
 
         if wf.getnchannels() != 1 or wf.getsampwidth() != 2 or wf.getcomptype() != "NONE":
-            print("Audio file must be WAV format mono PCM.")
+            logging.warning("Audio file must be WAV format mono PCM.")
 
         rec = vosk.KaldiRecognizer(self.recognition_model, wf.getframerate())
         # rec.SetWords(True)
