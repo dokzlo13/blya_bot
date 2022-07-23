@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app/models
 WORKDIR /app
 
-RUN pip install -U pip poetry==1.1.5
+RUN pip install -U pip poetry==1.1.14
 RUN poetry config virtualenvs.create false
 
 RUN apt-get update && apt-get install --no-install-recommends --yes \
