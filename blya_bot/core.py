@@ -12,13 +12,30 @@ from aiogram.utils.executor import start_polling
 
 from . import settings
 from .tools import async_wrap_iter
+from .health import HealthCheckApp
 
 bot = Bot(token=settings.BOT_TOKEN)
 dp = Dispatcher(bot)
 
+print("Loading model...")
 speech_model = vosk.Model(model_path=settings.VOSK_MODEL_PATH)
-
 print("Model loaded")
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+# Health check app
+
+health_check_app = HealthCheckApp(lambda: True, port=settings.HEALTH_CHECK_PORT)
+
+
+async def start_health_check(*args):
+    await health_check_app.start_http_server()
+
+
+async def stop_health_check(*args):
+    await health_check_app.stop_http_server()
+
+
+# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 def recognize(wav_buf: io.IOBase) -> Generator[None, str, None]:
@@ -99,4 +116,4 @@ async def handle_voice(message: types.Message):
 
 
 def main():
-    start_polling(dp, skip_updates=True)
+    start_polling(dp, skip_updates=True, on_startup=start_health_check, on_shutdown=stop_health_check)
