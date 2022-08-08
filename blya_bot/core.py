@@ -9,12 +9,11 @@ from aiogram.utils.executor import start_polling
 
 from . import settings
 from .audio import convert_ogg_to_wav
-from .health import HealthCheckApp
 from .recognition import SpeechRecognizer
 from .word_count import WordCounter, count_words_total, keyword_tree_from_file
 
 # TODO: better logging
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
 
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
@@ -34,24 +33,14 @@ speech_model = vosk.Model(model_path=settings.VOSK_MODEL_PATH)
 logging.info("Model loaded")
 
 # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-# Health check app
-
-health_check_app = HealthCheckApp(lambda: True, port=settings.HEALTH_CHECK_PORT)
-
-
-async def start_health_check(*args):
-    await health_check_app.start_http_server()
-
-
-async def stop_health_check(*args):
-    await health_check_app.stop_http_server()
-
-
-# - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
 
 @dp.message_handler(content_types=types.ContentType.VOICE)
 async def handle_voice(message: types.Message):
+    if message.forward_from is not None:
+        logging.info("Repost audio skipped")
+        return
+
     if message.voice.duration > settings.MY_NERVES_LIMIT:
         return await message.reply(settings.POLITE_RESPONSE)
 
@@ -61,7 +50,8 @@ async def handle_voice(message: types.Message):
     await message.voice.download(destination_file=ogg_buf)
     ogg_buf.seek(0)
 
-    wav_buf = await convert_ogg_to_wav(ogg_buf)
+    wav_buf = convert_ogg_to_wav(ogg_buf)
+    del ogg_buf
     recognizer = SpeechRecognizer(speech_model)
 
     # Counting words
@@ -70,12 +60,13 @@ async def handle_voice(message: types.Message):
     async for text in recognizer.recognize(wav_buf):
         full_text += text
         word_counter.feed(text)
+    del wav_buf
 
     counts = word_counter.summary()
+    logging.info(f"Message transcripted, elapsed time: {time()-start_time:.4f}sec.")
     if not len(counts):
         return
 
-    logging.info(f"Message transcripted, elapsed time: {time()-start_time:.4f}sec.")
     # Overall stats
     bad_words_total = sum(counts.values())
     words_total = count_words_total(full_text)
@@ -90,8 +81,44 @@ async def handle_voice(message: types.Message):
         f"или <b>{bad_words_percentage:.2f}%</b> :new_moon_face:"
     )
 
-    await message.reply(emoji.emojize(response_text), parse_mode=types.ParseMode.HTML)
+    return await message.reply(emoji.emojize(response_text), parse_mode=types.ParseMode.HTML)
+
+
+async def on_startup(app):
+    if settings.WEBHOOK_URL:
+        webhook_url = settings.WEBHOOK_URL
+    else:
+        webhook_url = f"https://{settings.HTTP_HOST}:{settings.HTTP_PORT}{settings.WEBHOOK_PATH}"
+
+    logging.info(f"Configuring webhook: {webhook_url!r}")
+    await bot.set_webhook(webhook_url)
+
+
+async def on_shutdown(app):
+    await bot.delete_webhook()
 
 
 def main():
-    start_polling(dp, skip_updates=True, on_startup=start_health_check, on_shutdown=stop_health_check)
+    from aiogram.dispatcher.webhook import configure_app
+    from aiohttp import web
+
+    from .health import add_health_check_probe
+
+    app = web.Application()
+    add_health_check_probe(app, lambda: True)
+
+    if settings.WEBHOOK_PATH:
+        app.on_startup.append(on_startup)
+        app.on_shutdown.append(on_shutdown)
+        configure_app(dp, app, path=settings.WEBHOOK_PATH)
+        try:
+            return web.run_app(app, host=settings.HTTP_HOST, port=settings.HTTP_PORT)
+        except SystemExit:
+            logging.info("Server exitted")
+
+    from .web_utils import BackgroundAppRunner
+
+    runner = BackgroundAppRunner(app)
+    runner.start_http_server(host=settings.HTTP_HOST, port=settings.HTTP_PORT)
+    start_polling(dp, skip_updates=True)
+    runner.stop_http_server()

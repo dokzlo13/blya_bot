@@ -22,8 +22,8 @@ class SpeechRecognizer:
 
         rec = vosk.KaldiRecognizer(self.recognition_model, wf.getframerate())
         # rec.SetWords(True)
-        rec.SetPartialWords(True)
-        rec.SetNLSML(True)
+        # rec.SetPartialWords(True)
+        # rec.SetNLSML(True)
 
         while True:
             data = wav_buf.read(4000)
@@ -35,6 +35,10 @@ class SpeechRecognizer:
 
         final_result = json.loads(rec.FinalResult())
         yield final_result["text"]
+
+        rec.Reset()
+        del rec
+        del wf
 
     def recognize(self, wav_buf: io.IOBase) -> AsyncGenerator[str, None]:
         return async_wrap_iter(self._recognize(wav_buf))
