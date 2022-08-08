@@ -91,14 +91,21 @@ async def on_startup(app):
         webhook_url = f"https://{settings.HTTP_HOST}:{settings.HTTP_PORT}{settings.WEBHOOK_PATH}"
 
     logging.info(f"Configuring webhook: {webhook_url!r}")
-    await bot.set_webhook(webhook_url)
-    logging.info("Webhook set")
+    is_wh_set = await bot.set_webhook(webhook_url)
+    if is_wh_set:
+        logging.info("Webhook set")
+    else:
+        logging.error("Webhook not set!")
+        raise SystemExit()
 
 
 async def on_shutdown(app):
     logging.info("Deleting webhook")
-    await bot.delete_webhook()
-    logging.info("Webhook deleted")
+    is_wh_del = await bot.delete_webhook()
+    if is_wh_del:
+        logging.info("Webhook deleted")
+    else:
+        logging.error("Webhook not deleted!")
 
 
 def main():
@@ -117,7 +124,7 @@ def main():
         app.on_shutdown.append(on_shutdown)
         configure_app(dp, app, path=settings.WEBHOOK_PATH)
         try:
-            return web.run_app(app, host=settings.HTTP_HOST, port=settings.HTTP_PORT)
+            web.run_app(app, host=settings.HTTP_HOST, port=settings.HTTP_PORT)
         except SystemExit:
             logging.info("Server exitted")
 

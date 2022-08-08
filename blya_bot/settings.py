@@ -15,8 +15,8 @@ if WEBHOOK_PATH is not None and not WEBHOOK_PATH.startswith("/"):
     raise Exception("'WEBHOOK_PATH' must begin with '/'")
 
 WEBHOOK_URL = getenv("WEBHOOK_URL", None)  # "https://my-server.com/webhook"
-HTTP_PORT = getenv("WEBHOOK_PORT", 8080)
-HTTP_HOST = getenv("WEBHOOK_HOST", "localhost")
+HTTP_PORT = getenv("HTTP_PORT", 8080)
+HTTP_HOST = getenv("HTTP_HOST", "localhost")
 
 MY_NERVES_LIMIT = 5 * 60
 POLITE_RESPONSE = "Бот сломан, больше пяти минут войса ему не переварить"
