@@ -92,14 +92,16 @@ async def on_startup(app):
 
     logging.info(f"Configuring webhook: {webhook_url!r}")
     await bot.set_webhook(webhook_url)
+    logging.info("Webhook set")
 
 
 async def on_shutdown(app):
+    logging.info("Deleting webhook")
     await bot.delete_webhook()
+    logging.info("Webhook deleted")
 
 
 def main():
-    from aiogram.dispatcher.webhook import configure_app
     from aiohttp import web
 
     from .health import add_health_check_probe
@@ -108,6 +110,9 @@ def main():
     add_health_check_probe(app, lambda: True)
 
     if settings.WEBHOOK_PATH:
+        logging.info("Starting in webhook mode")
+        from aiogram.dispatcher.webhook import configure_app
+
         app.on_startup.append(on_startup)
         app.on_shutdown.append(on_shutdown)
         configure_app(dp, app, path=settings.WEBHOOK_PATH)
@@ -116,9 +121,11 @@ def main():
         except SystemExit:
             logging.info("Server exitted")
 
-    from .web_utils import BackgroundAppRunner
+    else:
+        logging.info("Starting in polling mode")
+        from .web_utils import BackgroundAppRunner
 
-    runner = BackgroundAppRunner(app)
-    runner.start_http_server(host=settings.HTTP_HOST, port=settings.HTTP_PORT)
-    start_polling(dp, skip_updates=True)
-    runner.stop_http_server()
+        runner = BackgroundAppRunner(app)
+        runner.start_http_server(host=settings.HTTP_HOST, port=settings.HTTP_PORT)
+        start_polling(dp, skip_updates=True)
+        runner.stop_http_server()
