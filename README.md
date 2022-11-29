@@ -1,5 +1,7 @@
 # blya_bot
 
+[![Deploy to DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/dokzlo13/blya_bot/tree/master/)
+
 ## Build & Run
 
 ### Whisper - based
