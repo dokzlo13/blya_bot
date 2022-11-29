@@ -1,7 +1,9 @@
 import asyncio
-import logging
+import structlog
 
 from aiohttp import web
+
+logger = structlog.getLogger(__name__)
 
 
 class BackgroundAppRunner:
@@ -23,10 +25,10 @@ class BackgroundAppRunner:
         site = web.TCPSite(runner, host, port)
         await site.start()
 
-        logging.warning(f"Web app started at {host}:{port}")
+        logger.warning(f"Web app started at {host}:{port}")
         self._runner = runner  # type: ignore
 
     async def _stop_http_server(self) -> None:
         if self._runner is not None:
-            logging.warning("Web app stopped")
+            logger.warning("Web app stopped")
             await self._runner.cleanup()

@@ -1,0 +1,40 @@
+# syntax = docker/dockerfile:1.0-experimental
+
+FROM python:3.10.8-slim-buster
+
+ARG ENVIRONMENT
+ENV ENVIRONMENT=${ENVIRONMENT:-production}
+ENV PYTHONUNBUFFERED=1
+
+RUN mkdir -p /app/models
+WORKDIR /app
+
+RUN pip install -U pip poetry==1.2.2
+RUN poetry config virtualenvs.create false
+
+RUN apt-get update && apt-get install --no-install-recommends --yes \
+    wget \
+    ffmpeg \
+    # Required for git-based python packages installations (whisper)
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+# TODO: Get downloand link dynamically?
+RUN wget -O /app/models/small.pt https://openaipublic.azureedge.net/main/whisper/models/9ecf779972d90ba49c06d968637d720dd632c55bbf19d441fb42bf17a411e794/small.pt
+
+COPY poetry.lock /app
+COPY pyproject.toml /app
+
+RUN poetry install --no-dev --no-root -E "whisper" -E "pymorphy" \
+    && if [ "$ENVIRONMENT" = "development" ]; then poetry install --all-extras ; fi
+# I have some issues with installing whisper with poetry during build, so here we forcing installation by using pip
+RUN pip install git+https://github.com/openai/whisper.git 
+
+ENV RECOGNITION_ENGINE="whisper"
+ENV RECOGNITION_ENGINE_OPTIONS='{"model_name": "small", "language": "ru", "download_root": "/app/models"}'
+
+ADD fixtures /app/fixtures
+ADD blya_bot /app/blya_bot
+
+ENV PATH="/app:${PATH}"
+CMD ["python", "-m", "blya_bot"]

@@ -1,8 +1,14 @@
 import asyncio
-import logging
+from contextlib import contextmanager
 from typing import Callable
+from urllib.parse import ParseResult as UrllibParseResult
 
+import structlog
 from aiohttp import web
+
+from .web_utils import BackgroundAppRunner
+
+logger = structlog.getLogger(__name__)
 
 
 def handler(callback: Callable):
@@ -15,7 +21,7 @@ def handler(callback: Callable):
             else:
                 is_ok = callback()
         except Exception as e:
-            logging.error(e)
+            logger.error(e)
             return web.json_response({"ok": False, "message": e}, status=422)
 
         if is_ok:
@@ -28,3 +34,15 @@ def handler(callback: Callable):
 
 def add_health_check_probe(app: web.Application, probe_fn, path="/health/live"):
     app.add_routes([web.get(path, handler(probe_fn))])
+
+
+@contextmanager
+def health_check_server(probe_fn, host: str, port: int, path: str):
+    app = web.Application()
+    add_health_check_probe(app, probe_fn, path=path)
+    runner = BackgroundAppRunner(app)
+    runner.start_http_server(host=host, port=port)
+    try:
+        yield
+    finally:
+        runner.stop_http_server()
