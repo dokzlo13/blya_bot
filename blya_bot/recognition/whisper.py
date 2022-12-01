@@ -20,12 +20,14 @@ class WhisperSpeechRecognizer(SpeechRecognizer):
     @classmethod
     def from_options(cls, **options):
         logger.info("Loading whisper model", options=options)
-        download_root = options.get("download_root", None)
-        model_name = options.get("model_name", "tiny")
-        lang = options.get("language", "ru")
-        model = whisper.load_model(name=model_name, download_root=download_root)
+        model = whisper.load_model(
+            name=options.get("model_name", "tiny"),
+            download_root=options.get("download_root", None),
+            in_memory=options.get("in_memory", False),
+            device=options.get("device", "cuda"),
+        )
         logger.info("Whisper model loaded")
-        return cls(model, lang)
+        return cls(model, lang=options.get("language", "ru"))
 
     async def recognize(self, file: TempFile, media_type: MediaType) -> str:
         audio = whisper.load_audio(file.name)

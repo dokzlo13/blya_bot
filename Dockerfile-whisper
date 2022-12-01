@@ -31,7 +31,7 @@ RUN poetry install --no-dev --no-root -E "whisper" -E "pymorphy" \
 RUN pip install git+https://github.com/openai/whisper.git 
 
 ENV RECOGNITION_ENGINE="whisper"
-ENV RECOGNITION_ENGINE_OPTIONS='{"model_name": "small", "language": "ru", "download_root": "/app/models"}'
+ENV RECOGNITION_ENGINE_OPTIONS='{"model_name": "small", "language": "ru", "download_root": "/app/models", "device": "cpu"}'
 
 ADD fixtures /app/fixtures
 ADD blya_bot /app/blya_bot
