@@ -4,9 +4,9 @@
 
 ## Build & Run
 
-### Whisper - based
+### Vosk - based
 
-Building with [whisper](https://github.com/openai/whisper)  speech recognition core:
+Building with [vosk](https://github.com/alphacep/vosk-api) speech recognition core:
 
 ```
 docker build -f ./Dockerfile-vosk -t blya-bot-vosk:latest .
@@ -18,9 +18,9 @@ Running:
 docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-vosk:latest
 ```
 
-### Vosk - based
+### Whisper - based
 
-Building with [vosk](https://github.com/alphacep/vosk-api) speech recognition core:
+Building with [whisper](https://github.com/openai/whisper)  speech recognition core:
 
 ```
 docker build -f ./Dockerfile-whisper -t blya-bot-whisper:latest .
