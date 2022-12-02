@@ -11,7 +11,8 @@ ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app/models
 WORKDIR /app
 
-RUN pip install -U pip poetry==1.2.2
+# Forcing certificates
+RUN pip install --upgrade pip && pip install -U pip poetry==1.2.2
 RUN poetry config virtualenvs.create false
 
 RUN apt-get update && apt-get install --no-install-recommends --yes \
@@ -20,6 +21,7 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
     # Required for git-based python packages installations (whisper)
     git \
     && rm -rf /var/lib/apt/lists/*
+RUN wget -P /usr/local/share/ca-certificates/cacert.org http://www.cacert.org/certs/root.crt http://www.cacert.org/certs/class3.crt && update-ca-certificates
 
 # TODO: Get downloand link dynamically?
 RUN wget -O /app/models/small.pt https://openaipublic.azureedge.net/main/whisper/models/9ecf779972d90ba49c06d968637d720dd632c55bbf19d441fb42bf17a411e794/small.pt
