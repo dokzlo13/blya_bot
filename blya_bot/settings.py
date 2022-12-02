@@ -61,5 +61,5 @@ elif RECOGNITION_ENGINE == "whisper":
         raise Exception("Please provide 'model_name' option in 'RECOGNITION_ENGINE_OPTIONS' env")
 
 HEALTH_CHECK_HOST = env("HEALTH_CHECK_HOST", "0.0.0.0")
-HEALTH_CHECK_PORT = env.int("HEALTH_CHECK_HOST", 8080)
+HEALTH_CHECK_PORT = env.int("HEALTH_CHECK_PORT", 8080)
 HEALTH_CHECK_PATH = env("HEALTH_CHECK_PATH", "/health/live")

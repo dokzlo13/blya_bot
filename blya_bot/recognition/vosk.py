@@ -15,9 +15,8 @@ try:
     import pydub
     import vosk
 except ImportError:
-    logger.warning("'vosk' recognition core dependencies not installed")
-    pydub = None
-    vosk = None
+    logger.error("'vosk' recognition core dependencies not installed")
+    raise
 
 
 # TODO: make converter really async

@@ -1,7 +1,0 @@
-spec:
- name: blya-bot-app
- services:
- - name: blya-bot
-   git:
-     branch: master
-     repo_clone_url: https://github.com/dokzlo13/blya_bot.git

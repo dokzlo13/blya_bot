@@ -1,16 +1,15 @@
-from collections import namedtuple, defaultdict
-from typing import Optional, Tuple, Generator
-
+from collections import defaultdict, namedtuple
+from typing import Generator, Optional, Tuple
 
 Split = namedtuple("Split", "pos, sep")
 Separator = namedtuple("Separator", "idx, value, length")
 
 
-def highlight_text(text: str, markup: dict[tuple[int, int], str]) -> str:
+def highlight_text(text: str, markup: dict[tuple[int, int], str], highlight: tuple[str, str] = ("<b>", "</b>")) -> str:
     highlighted_text = ""
     prev_end = 0
     for (start, end), word in markup.items():
-        highlighted_text += text[prev_end:start] + "<b>" + word.upper() + "</b>"
+        highlighted_text += text[prev_end:start] + highlight[0] + word.upper() + highlight[1]
         prev_end = end
     return highlighted_text
 
@@ -65,7 +64,7 @@ def split_in_chunks(
                 else:
                     if allow_no_sep_split:
                         return pos, current_text[:pos]
-                    raise ValueError(f"Oops! Text could not be properly split in chunks")
+                    raise ValueError("Oops! Text could not be properly split in chunks")
         else:
             return len(current_text) - 1, current_text
 

@@ -1,7 +1,6 @@
 import asyncio
 from contextlib import contextmanager
 from typing import Callable
-from urllib.parse import ParseResult as UrllibParseResult
 
 import structlog
 from aiohttp import web
@@ -41,8 +40,10 @@ def health_check_server(probe_fn, host: str, port: int, path: str):
     app = web.Application()
     add_health_check_probe(app, probe_fn, path=path)
     runner = BackgroundAppRunner(app)
+    logger.info("Starting health check server...")
     runner.start_http_server(host=host, port=port)
     try:
         yield
     finally:
+        logger.info("Stopping health check server...")
         runner.stop_http_server()

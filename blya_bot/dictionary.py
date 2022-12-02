@@ -3,6 +3,22 @@ import string
 import warnings
 from itertools import product
 
+import structlog
+
+# TODO: Another languages
+try:
+    import pymorphy2
+    import pymorphy2_dicts_ru
+
+    morph = pymorphy2.MorphAnalyzer(path=pymorphy2_dicts_ru.get_path())
+
+except ImportError:
+    warnings.warn("Morphological extension is not available, install 'pymorphy2' and 'pymorphy2-dicts-ru'")
+    morph = None
+
+
+logger = structlog.getLogger(__name__)
+
 VARIANTS_REGEX = re.compile(
     r"(\[(?P<variants_1>[^\]]*)\]|\{(?P<variants_2>[^\}]*)\})", flags=re.UNICODE | re.IGNORECASE
 )
@@ -14,10 +30,6 @@ def parse_group(group: str) -> tuple[str, ...]:
         return parsed_group
     else:
         return ("",) + parsed_group
-
-
-def multi_bracket(expr=r"\w+"):
-    return r"(\[(?P<variants_1>[^\]]+)\]|\{(?P<variants_2>[^\}]+)\})"
 
 
 def split_in_groups(word):
@@ -39,38 +51,65 @@ def split_in_groups(word):
     return groups
 
 
-def parse_dictionary(rows: list[str]) -> list[str]:
-    all_words = []
+def product_variants(word: str) -> set[str]:
+    return set("".join(parts) for parts in product(*split_in_groups(word)))
+
+
+def parse_dictionary(rows: list[str], extend_by_morphing: bool = True) -> list[str]:
+    all_words: set[str] = set()
+    exclude_words: set[str] = set()
+
+    raw_words_read = 0
+
     for raw_word in rows:
         word = raw_word.strip().lower()
         if not word or word.startswith("#"):
             continue
-        all_words.extend(list("".join(parts) for parts in product(*split_in_groups(word))))
-    return all_words
+
+        raw_words_read += 1
+
+        use_morph_this_word = extend_by_morphing
+        if "!" in word:
+            word = word.replace("!", "")
+            use_morph_this_word = False
+
+        if word.startswith("~"):
+            temp_words = product_variants(word.replace("~", ""))
+            if use_morph_this_word:
+                exclude_words.update(product_morphs(temp_words))
+            else:
+                exclude_words.update(temp_words)
+        else:
+            temp_words = product_variants(word)
+            if use_morph_this_word:
+                all_words.update(product_morphs(temp_words))
+            else:
+                all_words.update(temp_words)
+
+    done_dict = sorted(list(all_words - exclude_words))
+    logger.info("Dictionary generated", raw_words=raw_words_read, final_dict=len(done_dict))
+    return done_dict
 
 
-def get_all_morphs(words: list[str]) -> list[str]:
-    try:
-        import pymorphy2
-        import pymorphy2_dicts_ru
-    except ImportError:
-        warnings.warn("Morphological extension is not available, install 'pymorphy2'")
-        return words
-    morph = pymorphy2.MorphAnalyzer(path=pymorphy2_dicts_ru.get_path())
+def get_all_morphs(word: str) -> set[str]:
+    if morph is None:
+        return {word}
 
     words_set: set[str] = set()
-    for word in words:
-        if "!" in word:
-            words_set.add(word.replace("!", ""))
-            continue
+    words_set.add(word)
+    for variant in morph.parse(word):
+        for inflect in variant.lexeme:
+            dict_word = normalize_text(inflect.word)
+            if len(dict_word) > 2:
+                words_set.add(dict_word)
+    return words_set
 
-        words_set.add(word)
-        for variant in morph.parse(word):
-            for inflect in variant.lexeme:
-                dict_word = normalize_text(inflect.word)
-                if len(dict_word) > 2:
-                    words_set.add(dict_word)
-    return sorted(list(words_set))
+
+def product_morphs(words: set[str]) -> set[str]:
+    words_set: set[str] = set()
+    for word in words:
+        words_set.update(get_all_morphs(word))
+    return words_set
 
 
 def count_words_total(text) -> int:

@@ -2,6 +2,7 @@
 # #... - Comment
 # !<word> - to disable morphing for this word. This token is global, and can be placed in any part of word.
 #   Expansions will also contain this token, and morphing will be disabled for variants too
+# ~<word> - excludes word from dictionary. Applied after variants generation and morphing. Must be placed at word start.
 # [...|...] - expand to word with extra variants (suffixes, prefixes). 
 #   This will also include word without this elements, like: he[llo|ll] -> he, hello, hell
 #   Can be used with single variant only, like: bad[ass] -> bad, badass
@@ -142,4 +143,5 @@
 б{е|а}ндера
 целка
 
-
+# Excludes
+~!себ

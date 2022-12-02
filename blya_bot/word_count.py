@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from collections import Counter
 from dataclasses import dataclass
 from operator import itemgetter
@@ -6,7 +8,7 @@ from typing import Dict, Iterable, List
 import structlog
 from ahocorapy.keywordtree import KeywordTree
 
-from .dictionary import get_all_morphs, normalize_text, parse_dictionary
+from .dictionary import normalize_text, parse_dictionary
 
 logger = structlog.getLogger(__name__)
 
@@ -21,12 +23,12 @@ def build_keyword_tree_from_word_iter(it: Iterable[str]):
 
 def keyword_tree_from_file(word_list_file: str, extend_by_morphing: bool = True) -> KeywordTree:
     with open(word_list_file, "r") as fp:
-        words = parse_dictionary(fp.readlines())
-        if extend_by_morphing:
-            logger.info("Extending dictionary by morphing", words_before_morph=len(words))
-            words = get_all_morphs(words)
-            logger.info("Dictionary extended", words_after_morph=len(words))
-        return build_keyword_tree_from_word_iter(words)
+        logger.debug("Parsing dictionary...")
+        words = parse_dictionary(fp.readlines(), extend_by_morphing)
+        logger.debug("Assembling keyword tree...")
+        kwtree = build_keyword_tree_from_word_iter(words)
+        logger.debug("Keyword tree assembled")
+        return kwtree
 
 
 @dataclass
@@ -35,7 +37,7 @@ class TextSummary:
     markup: dict[tuple[int, int], str]
 
 
-class WordCounter:
+class _WordCounter:
     def __init__(self, kwtree: KeywordTree) -> None:
         self._kwtree = kwtree
         self._counts: Counter = Counter()
@@ -79,3 +81,17 @@ class WordCounter:
         return TextSummary(
             counter=Counter({w: c for w, c in self._counts.items() if c > 0}), markup=self._markup.copy()
         )
+
+
+class WordCounterEngine:
+    @classmethod
+    def from_file(cls, file_name: str) -> WordCounterEngine:
+        return cls(keyword_tree_from_file(file_name))
+
+    def __init__(self, keyword_tree: KeywordTree) -> None:
+        self.kwtree = keyword_tree
+
+    def calculate_summary(self, text) -> TextSummary:
+        counter = _WordCounter(self.kwtree)
+        counter.feed(text)
+        return counter.summary()

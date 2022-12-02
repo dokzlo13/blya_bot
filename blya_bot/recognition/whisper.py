@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import structlog
 
 from .interface import MediaType, SpeechRecognizer, TempFile
@@ -8,23 +10,23 @@ logger = structlog.getLogger(__name__)
 try:
     import whisper
 except ImportError:
-    logger.warning("'whisper' recognition core dependencies not installed")
-    whisper = None
+    logger.error("'whisper' recognition core dependencies not installed")
+    raise
 
 
 class WhisperSpeechRecognizer(SpeechRecognizer):
-    def __init__(self, whisper_model, lang: str) -> None:
+    def __init__(self, whisper_model: "whisper.Whisper", lang: str) -> None:
         self.model = whisper_model
         self.lang = lang
 
     @classmethod
-    def from_options(cls, **options):
+    def from_options(cls, **options) -> WhisperSpeechRecognizer:
         logger.info("Loading whisper model", options=options)
         model = whisper.load_model(
-            name=options.get("model_name", "tiny"),
+            name=options["model_name"],
+            device=options.get("device", None),
             download_root=options.get("download_root", None),
             in_memory=options.get("in_memory", False),
-            device=options.get("device", "cuda"),
         )
         logger.info("Whisper model loaded")
         return cls(model, lang=options.get("language", "ru"))
