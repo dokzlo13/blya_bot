@@ -11,7 +11,6 @@ ENV PYTHONUNBUFFERED=1
 RUN mkdir -p /app/models
 WORKDIR /app
 
-# Forcing certificates
 RUN pip install --upgrade pip && pip install -U pip poetry==1.2.2
 RUN poetry config virtualenvs.create false
 
@@ -21,6 +20,8 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
     # Required for git-based python packages installations (whisper)
     git \
     && rm -rf /var/lib/apt/lists/*
+
+# Forcing certificates
 RUN wget -P /usr/local/share/ca-certificates/cacert.org http://www.cacert.org/certs/root.crt http://www.cacert.org/certs/class3.crt && update-ca-certificates
 
 # TODO: Get downloand link dynamically?
@@ -32,7 +33,7 @@ COPY pyproject.toml /app
 RUN poetry install --no-dev --no-root -E "whisper" -E "pymorphy" \
     && if [ "$ENVIRONMENT" = "development" ]; then poetry install --all-extras ; fi
 # I have some issues with installing whisper with poetry during build, so here we forcing installation by using pip
-RUN pip install git+https://github.com/openai/whisper.git 
+RUN pip install whisper
 
 ENV RECOGNITION_ENGINE="whisper"
 ENV RECOGNITION_ENGINE_OPTIONS='{"model_name": "small", "language": "ru", "download_root": "/app/models", "device": "cpu"}'
