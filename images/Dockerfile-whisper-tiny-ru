@@ -1,8 +1,5 @@
 # syntax = docker/dockerfile:1.0-experimental
 
-# THIS IS JUST A COPY OF "./images/Dockerfile-vosk-small-ru". 
-# Used only for DO (DigitalOcean) app platform deploy
-
 FROM python:3.10.8-slim-buster
 
 ARG ENVIRONMENT
@@ -17,26 +14,26 @@ RUN poetry config virtualenvs.create false
 
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     wget \
-    zip \
-    unzip \
     ffmpeg \
+    # Required for git-based python packages installations (whisper)
+    git \
     && rm -rf /var/lib/apt/lists/*
 
-# Forcing certificates
 RUN wget -P /usr/local/share/ca-certificates/cacert.org http://www.cacert.org/certs/root.crt http://www.cacert.org/certs/class3.crt && update-ca-certificates
 
 # TODO: Get downloand link dynamically?
-RUN wget -O /app/models/vosk-model-small-ru-0.22.zip https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip \
-    && unzip '/app/models/vosk-model-small-ru-0.22.zip' -d /app/models/ && rm /app/models/vosk-model-small-ru-0.22.zip || true;
+RUN wget -O /app/models/small.pt https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt
 
 COPY poetry.lock /app
 COPY pyproject.toml /app
 
-RUN poetry install --no-dev --no-root -E "vosk" -E "pymorphy"\
-    && if [ "$ENVIRONMENT" = "development" ]; then poetry install --all-extras; fi
+RUN poetry install --no-dev --no-root -E "whisper" -E "pymorphy" \
+    && if [ "$ENVIRONMENT" = "development" ]; then poetry install --all-extras ; fi
+# I have some issues with installing whisper with poetry during build, so here we forcing installation by using pip
+RUN pip install whisper
 
-ENV RECOGNITION_ENGINE="vosk"
-ENV RECOGNITION_ENGINE_OPTIONS='{"model_path": "/app/models/vosk-model-small-ru-0.22"}'
+ENV RECOGNITION_ENGINE="whisper"
+ENV RECOGNITION_ENGINE_OPTIONS='{"model_name": "tiny", "language": "ru", "download_root": "/app/models", "device": "cpu"}'
 
 ADD fixtures /app/fixtures
 ADD blya_bot /app/blya_bot
