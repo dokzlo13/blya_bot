@@ -180,3 +180,14 @@ docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-whisper:small-ru
   - [ ] Add other languages support for morphological analysis
   - [ ] Summary templates
   - [ ] Remove all language-dependent parts from sources
+
+
+## Contributing
+
+1. Fork it
+2. Clone it: `git clone https://github.com/dokzlo13/blya_bot.git`
+3. Create your feature branch: `git checkout -b my-new-feature`
+4. Make changes and add them: `git add .`
+5. Commit: `git commit -m 'My awesome feature'`
+6. Push: `git push origin my-new-feature`
+7. Pull request
