@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import structlog
 
-from .interface import MediaType, SpeechRecognizer, TempFile
+from .interface import MediaType, BaseSpeechRecognizer, TempFile
 
 logger = structlog.getLogger(__name__)
 
@@ -14,7 +14,7 @@ except ImportError:
     raise
 
 
-class WhisperSpeechRecognizer(SpeechRecognizer):
+class WhisperSpeechRecognizer(BaseSpeechRecognizer):
     def __init__(self, whisper_model: "whisper.Whisper", lang: str) -> None:
         self.model = whisper_model
         self.lang = lang

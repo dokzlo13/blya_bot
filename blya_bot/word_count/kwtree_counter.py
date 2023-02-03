@@ -1,40 +1,17 @@
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
 from operator import itemgetter
-from typing import Dict, Iterable, List
+from typing import Dict, List
 
 import structlog
 from ahocorapy.keywordtree import KeywordTree
 
-from .dictionary import normalize_text, parse_dictionary
+from blya_bot.models import TextSummary
+from .interface import BaseWordCounter
+from .utils import normalize_text
 
 logger = structlog.getLogger(__name__)
-
-
-def build_keyword_tree_from_word_iter(it: Iterable[str]):
-    kwtree = KeywordTree(case_insensitive=True)
-    for word in it:
-        kwtree.add(word.strip())
-    kwtree.finalize()
-    return kwtree
-
-
-def keyword_tree_from_file(word_list_file: str, extend_by_morphing: bool = True) -> KeywordTree:
-    with open(word_list_file, "r") as fp:
-        logger.debug("Parsing dictionary...")
-        words = parse_dictionary(fp.readlines(), extend_by_morphing)
-        logger.debug("Assembling keyword tree...")
-        kwtree = build_keyword_tree_from_word_iter(words)
-        logger.debug("Keyword tree assembled")
-        return kwtree
-
-
-@dataclass
-class TextSummary:
-    counter: Counter
-    markup: dict[tuple[int, int], str]
 
 
 class _WordCounter:
@@ -83,13 +60,19 @@ class _WordCounter:
         )
 
 
-class WordCounterEngine:
-    @classmethod
-    def from_file(cls, file_name: str) -> WordCounterEngine:
-        return cls(keyword_tree_from_file(file_name))
-
+class KWTreeWordCounter(BaseWordCounter):
     def __init__(self, keyword_tree: KeywordTree) -> None:
         self.kwtree = keyword_tree
+
+    @classmethod
+    def from_dictionary(cls, dictionary: list[str]) -> KWTreeWordCounter:
+        logger.info("Creating KWTree..")
+        kwtree = KeywordTree(case_insensitive=True)
+        for word in dictionary:
+            kwtree.add(word.strip())
+        kwtree.finalize()
+        logger.info("KWTree created")
+        return cls(kwtree)
 
     def calculate_summary(self, text) -> TextSummary:
         counter = _WordCounter(self.kwtree)

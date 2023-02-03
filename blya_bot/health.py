@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import contextmanager
+from contextlib import contextmanager, asynccontextmanager
 from typing import Callable
 
 import structlog
@@ -36,10 +36,10 @@ def add_health_check_probe(app: web.Application, probe_fn, path="/health/live"):
 
 
 @contextmanager
-def health_check_server(probe_fn, host: str, port: int, path: str):
+def health_check_server(probe_fn, host: str, port: int, path: str, loop=None):
     app = web.Application()
     add_health_check_probe(app, probe_fn, path=path)
-    runner = BackgroundAppRunner(app)
+    runner = BackgroundAppRunner(app, loop=loop)
     logger.info("Starting health check server...")
     runner.start_http_server(host=host, port=port)
     try:
@@ -47,3 +47,17 @@ def health_check_server(probe_fn, host: str, port: int, path: str):
     finally:
         logger.info("Stopping health check server...")
         runner.stop_http_server()
+
+
+@asynccontextmanager
+async def async_health_check_server(probe_fn, host: str, port: int, path: str, loop=None):
+    app = web.Application()
+    add_health_check_probe(app, probe_fn, path=path)
+    runner = BackgroundAppRunner(app, loop=loop)
+    logger.info("Starting health check server...")
+    await runner.async_start_http_server(host=host, port=port)
+    try:
+        yield
+    finally:
+        logger.info("Stopping health check server...")
+        await runner.async_stop_http_server()

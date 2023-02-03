@@ -110,6 +110,8 @@ RECOGNITION_ENGINE_OPTIONS='{"model_path": "/path/to/vosk-model"}'
 RECOGNITION_ENGINE="vosk"
 ```
 
+### Whisper
+
 ```env
 TELEGRAM_BOT_TOKEN="<YOUR TOKEN>"
 
@@ -171,7 +173,7 @@ docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-whisper:small-ru
 - [x] Highlight all bad words
 - [x] Handle voice notes
 - [x] Handle video notes
-- [ ] Caching/storing transcriptions
+- [x] Caching/storing transcriptions
 - [x] Send transcription to chat
 - [ ] Telegram webhook
 - [ ] Configurable "transcribe" commands for bot

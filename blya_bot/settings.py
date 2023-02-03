@@ -63,3 +63,16 @@ elif RECOGNITION_ENGINE == "whisper":
 HEALTH_CHECK_HOST = env("HEALTH_CHECK_HOST", "0.0.0.0")
 HEALTH_CHECK_PORT = env.int("HEALTH_CHECK_PORT", 8080)
 HEALTH_CHECK_PATH = env("HEALTH_CHECK_PATH", "/health/live")
+
+CACHE_ENGINE = env("CACHE_ENGINE", None)
+CACHE_PARAMS = env.json("CACHE_PARAMS", "{}")
+if CACHE_ENGINE == "sqlite":
+    if CACHE_PARAMS.get("db_path") is None:
+        CACHE_PARAMS["db_path"] = "transcription_cache.db"
+elif CACHE_ENGINE == "memory":
+    if CACHE_PARAMS.get("ttl") is None:
+        CACHE_PARAMS["ttl"] = 60 * 60
+elif CACHE_ENGINE is None:
+    pass
+else:
+    raise Exception("CACHE_ENGINE can be only 'sqlite' or 'memory'")

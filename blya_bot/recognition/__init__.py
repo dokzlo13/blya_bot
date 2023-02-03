@@ -1,11 +1,11 @@
 from typing import Type
 
-from .interface import MediaType, SpeechRecognizer, TempFile
+from .interface import MediaType, BaseSpeechRecognizer, TempFile
 
 _AVAILABLE_RECOGNIZERS = ["vosk", "whisper"]
 
 
-def get_recognizer_by_name(name: str) -> Type[SpeechRecognizer]:
+def get_recognizer_by_name(name: str) -> Type[BaseSpeechRecognizer]:
     # Here we importing recognizers in runtime, becuase "whisper" has some issues for loading model weights
     #   if "vosk" module already imported. Loading model causes "segmentation failure" crash.
     if name == "vosk":
@@ -30,7 +30,7 @@ def get_recognizer_by_name(name: str) -> Type[SpeechRecognizer]:
 
 __all__ = (
     "MediaType",
-    "SpeechRecognizer",
+    "BaseSpeechRecognizer",
     "TempFile",
     # "VoskSpeechRecognizer",
     # "WhisperSpeechRecognizer",

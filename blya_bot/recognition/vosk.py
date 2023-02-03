@@ -7,7 +7,7 @@ from typing import Generator
 
 import structlog
 
-from .interface import MediaType, SpeechRecognizer, TempFile
+from .interface import MediaType, BaseSpeechRecognizer, TempFile
 
 logger = structlog.getLogger(__name__)
 
@@ -65,7 +65,7 @@ def async_wrap_iter(it):
     return yield_queue_items()
 
 
-class VoskSpeechRecognizer(SpeechRecognizer):
+class VoskSpeechRecognizer(BaseSpeechRecognizer):
     def __init__(self, model: "vosk.Model") -> None:
         self.model = model
 

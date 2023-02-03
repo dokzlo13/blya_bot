@@ -17,6 +17,7 @@ vosk = {version = "^0.3.43", optional = true}
 pydub = {version = "^0.25.1", optional = true}
 pymorphy2 = {version = "^0.9.1", optional = true }
 pymorphy2-dicts-ru = {version = "^2.4.417127.4579844", optional = true }
+aiosqlite = "^0.18.0"
 
 [tool.poetry.dev-dependencies]
 flake8 = "^4.0.1"

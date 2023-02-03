@@ -9,7 +9,7 @@ class MediaType(Enum):
     VIDEO_NOTE = auto()
 
 
-class SpeechRecognizer(Protocol):
+class BaseSpeechRecognizer(Protocol):
     @classmethod
     @abstractmethod
     def from_options(cls, **options):
