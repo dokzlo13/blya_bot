@@ -125,7 +125,7 @@ dmypy.json
 
 
 # Other
-models/
+./models/
 
 # Random files may be placed in thos folder
 /trash
