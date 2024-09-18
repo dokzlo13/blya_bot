@@ -41,3 +41,9 @@ class InMemoryTranscriptionCache(BaseTranscriptionCache):
         for key in expired_keys:
             self._cache.pop(key, None)  # type: ignore
             self._expiration.pop(key, None)
+
+    async def setup(self):
+        pass
+
+    async def teardown(self):
+        pass

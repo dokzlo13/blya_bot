@@ -101,11 +101,11 @@ class VoskSpeechRecognizer(BaseSpeechRecognizer):
         del rec
         del wf
 
-    async def recognize(self, file: TempFile, media_type: MediaType) -> str:
+    async def recognize(self, file: TempFile) -> str:
         format_map = {
             MediaType.VIDEO_NOTE: "mp4",
             MediaType.VOICE: "ogg",
         }
-        wav_buf = convert_audio(file.file, format_map[media_type])  # type: ignore
+        wav_buf = convert_audio(file.file, format_map[media_type]) # FIXME
         parts = [part async for part in async_wrap_iter(self._recognize(wav_buf))]
         return "".join(parts)

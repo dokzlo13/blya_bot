@@ -9,7 +9,7 @@ logger = structlog.getLogger(__name__)
 
 try:
     import whisper
-except ImportError:
+except (ImportError, ModuleNotFoundError):
     logger.error("'whisper' recognition core dependencies not installed")
     raise
 

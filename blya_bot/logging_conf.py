@@ -50,6 +50,7 @@ def configure_logging(log_level="info", console_colors=True):
         },
         "loggers": {
             "": {"level": log_level.upper(), "handlers": ["default"], "propagate": True},
+            "aiosqlite": {"level": "ERROR", "handlers": ["default"], "propagate": False},  # Filter for aiosqlite
         },
     }
 

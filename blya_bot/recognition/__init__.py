@@ -2,7 +2,7 @@ from typing import Type
 
 from .interface import MediaType, BaseSpeechRecognizer, TempFile
 
-_AVAILABLE_RECOGNIZERS = ["vosk", "whisper"]
+_AVAILABLE_RECOGNIZERS = ["vosk", "whisper", "fast-whisper"]
 
 
 def get_recognizer_by_name(name: str) -> Type[BaseSpeechRecognizer]:
@@ -23,6 +23,14 @@ def get_recognizer_by_name(name: str) -> Type[BaseSpeechRecognizer]:
             raise
         else:
             return WhisperSpeechRecognizer
+
+    elif name == "fast-whisper":
+        try:
+            from .fast_whisper import FastWhisperSpeechRecognizer
+        except ImportError:
+            raise
+        else:
+            return FastWhisperSpeechRecognizer
 
     else:
         raise Exception(f"Unknown recognizer name {name!r}, available recognizers: {', '.join(_AVAILABLE_RECOGNIZERS)}")

@@ -1,14 +1,15 @@
 import asyncio
 import signal
 import sys
+from pathlib import Path
 
 import aiosqlite
 import structlog
-from aiogram.utils import executor
 
+# from aiogram.utils import executor
 from . import settings
 from .core import BotCore
-from .dictionary import BaseDictionaryLoader, DslDictLoader, PyMorphyRuDslDictLoader
+from .dictionary import DslFileDict, IDictionaryLoader, PyMorphyRuDictModifier
 from .health import async_health_check_server
 from .logging_conf import configure_logging
 from .recognition import BaseSpeechRecognizer, get_recognizer_by_name
@@ -19,7 +20,7 @@ from .transcription_cache import (
     NullTranscriptionCache,
     SqliteTranscriptionCache,
 )
-from .word_count import BaseWordCounter, KWTreeWordCounter
+from .word_count import AhoCorasickWordCounter, BaseWordCounter
 
 logger = structlog.getLogger(__name__)
 STOP_SIGNALS = (signal.SIGHUP, signal.SIGINT, signal.SIGTERM)
@@ -34,19 +35,19 @@ def load_recognition_core() -> BaseSpeechRecognizer:
 
 
 def load_word_counter() -> BaseWordCounter:
-    loader: BaseDictionaryLoader
-    try:
-        loader = PyMorphyRuDslDictLoader()
-        logger.info("Dict loader created", engine="PyMorphyRuDslDictLoader")
-    except ImportError:
-        logger.warning("Morphological extension dependencies not installed, falling back to DslDictLoader")
-        loader = DslDictLoader()
-        logger.info("Dict loader created", engine="DslDictLoader")
+    loader = DslFileDict(equal_chars=[("е", "ё"), ("и", "й")])
+    logger.info("Dict loader created", engine="DslFileDict")
 
-    logger.info("Loading dictionary file", path=settings.SERVICE_BAD_WORDS_FILE)
-    dictionary = loader.load_dictionary(settings.SERVICE_BAD_WORDS_FILE)
-    kwtree = KWTreeWordCounter.from_dictionary(dictionary)
-    return kwtree
+    logger.info("Loading dictionary file...", path=settings.SERVICE_BAD_WORDS_FILE)
+    dictionary = loader.load(settings.SERVICE_BAD_WORDS_FILE)
+    logger.info("Dict loaded", total_loaded=len(dictionary))
+
+    logger.info("Morphing word forms...")
+    dictionary = PyMorphyRuDictModifier().modify_dict(dictionary)
+    logger.info("Dict morphed", total_morphed=len(dictionary))
+
+    logger.info("Assembling automata...")
+    return AhoCorasickWordCounter.from_dictionary(dictionary)
 
 
 async def make_cache() -> BaseTranscriptionCache:
@@ -57,9 +58,10 @@ async def make_cache() -> BaseTranscriptionCache:
         logger.info("Cache engine loaded", ttl=ttl, engine="InMemoryTranscriptionCache")
     elif settings.CACHE_ENGINE == "sqlite":
         db_path = settings.CACHE_PARAMS["db_path"]
+        ttl = settings.CACHE_PARAMS.get("ttl", None)
         conn = await aiosqlite.connect(db_path)
-        cache = SqliteTranscriptionCache(conn)
-        logger.info("Cache engine loaded", db_path=db_path, engine="SqliteTranscriptionCache")
+        cache = SqliteTranscriptionCache(conn, ttl)
+        logger.info("Cache engine loaded", db_path=db_path, ttl=ttl, engine="SqliteTranscriptionCache")
     else:
         cache = NullTranscriptionCache()
         logger.warning("Cache settings not defined, cache disabled")
@@ -80,32 +82,34 @@ async def _main(stop_event: asyncio.Event, loop):
     async with async_health_check_server(
         lambda: True, settings.HEALTH_CHECK_HOST, settings.HEALTH_CHECK_PORT, settings.HEALTH_CHECK_PATH, loop=loop
     ):
-        dispatcher = build_bot(settings.TELEGRAM_BOT_TOKEN, bot_core)
+        bot, dispatcher = build_bot(settings.TELEGRAM_BOT_TOKEN, bot_core)
 
         # Hacking executor, to work inside current running loop
-        ex = executor.Executor(dispatcher=dispatcher, skip_updates=True, loop=loop)
+        # ex = executor.Executor(dispatcher=dispatcher, skip_updates=True, loop=loop)
 
-        async def master_task():
-            ex._prepare_polling()
-            await ex._startup_polling()
-            try:
-                await ex.dispatcher.start_polling(
-                    reset_webhook=None, timeout=20, relax=0.1, fast=True, allowed_updates=None
-                )
-            finally:
-                await ex._shutdown_polling()
+        # async def master_task():
+        #     ex._prepare_polling()
+        #     await ex._startup_polling()
+        #     try:
+        #         await ex.dispatcher.start_polling(
+        #             reset_webhook=None, timeout=20, relax=0.1, fast=True, allowed_updates=None
+        #         )
+        #     finally:
+        #         await ex._shutdown_polling()
 
-        task = asyncio.create_task(master_task())
-        await stop_event.wait()
+        await dispatcher.start_polling(bot)
+
+        # task = asyncio.create_task()
+        # await stop_event.wait()
         await cache.teardown()
 
-        if not task.done():
-            task.cancel()
+        # if not task.done():
+        #     task.cancel()
 
-        try:
-            await task
-        except asyncio.CancelledError:
-            logger.warning(f"Task {task.get_name()!r} terminated")
+        # try:
+        #     await task
+        # except asyncio.CancelledError:
+        #     logger.warning(f"Task {task.get_name()!r} terminated")
 
 
 # def _main():

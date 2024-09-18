@@ -16,5 +16,5 @@ class BaseSpeechRecognizer(Protocol):
         pass
 
     @abstractmethod
-    async def recognize(self, file: TempFile, media_type: MediaType) -> str:
+    async def recognize(self, file: TempFile) -> str:
         pass
