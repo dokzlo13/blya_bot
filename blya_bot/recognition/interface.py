@@ -1,18 +1,14 @@
+from __future__ import annotations
+
 from abc import abstractmethod
-from enum import Enum, auto
 from tempfile import _TemporaryFileWrapper as TempFile
 from typing import Protocol
-
-
-class MediaType(Enum):
-    VOICE = auto()
-    VIDEO_NOTE = auto()
 
 
 class BaseSpeechRecognizer(Protocol):
     @classmethod
     @abstractmethod
-    def from_options(cls, **options):
+    def from_options(cls, **options) -> BaseSpeechRecognizer:
         pass
 
     @abstractmethod

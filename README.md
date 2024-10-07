@@ -61,7 +61,7 @@ If you want to try this bot with other language, just remove `pymorphy2` and `py
 
 ## Build & Run
 
-### Installing app dependencies
+### Install app dependencies
 
 You can install blya-bot locally, with [poetry](https://python-poetry.org/):
 ```bash
@@ -78,46 +78,65 @@ $ poetry install --no-root --all-extras
 
 Next, you need to gather speech recognition model files.
 
-Current "blya_bot" implementation supports two different speech recognition engines: [vosk](https://github.com/alphacep/vosk-api) and [whisper](https://github.com/openai/whisper).
+Current "blya_bot" implementation supports multiple speech recognition engines:
 
-### Vosk
+- [vosk](https://github.com/alphacep/vosk-api)
+- [whisper](https://github.com/openai/whisper) via [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+- [whisper](https://github.com/openai/whisper) via [pywhispercpp](https://github.com/abdeladim-s/pywhispercpp) bindings for [whisper.cpp](https://github.com/ggerganov/whisper.cpp)
+
+#### Vosk
 
 You can download models for `vosk` on this website - https://alphacephei.com/vosk/models
 
-Place model in folder you like, and specify path to this model, on next step.
+Place model in folder you like, and specify path to this model during configuration.
 
-### Whisper
+#### Faster-Whisper
 
-`Whisper` models will be downloaded automatically on first application start.
+Models will be downloaded automatically on first application start.
 
-You can download it manually, by using links from [`whisper` repository](https://github.com/openai/whisper/blob/main/whisper/__init__.py#L17) (may be removed, just check Whisper source code for this).
+Default models folder is `~/.cache/huggingface/hub`.
 
-Default models folder is `~/.cache/whisper`.
+#### Pywhispercpp
 
-### Configure & run
+Models will be downloaded automatically on first application start.
+
+Default models folder is `~/.local/share/pywhispercpp/models`.
+
+### Configuration
 
 When all dependencies installed and model files obtained, you need to configure settings.
 
 Create `.env` file in this directory, and populate required options:
 
-### Vosk
+#### Vosk
 
 ```env
 TELEGRAM_BOT_TOKEN="<YOUR TOKEN>"
 
+RECOGNITION_ENGINE="vosk"
 # At now, has only one option - `model_name`. Specify path to downloaded model
 RECOGNITION_ENGINE_OPTIONS='{"model_path": "/path/to/vosk-model"}'
-RECOGNITION_ENGINE="vosk"
 ```
 
-### Whisper
+#### Faster-Whisper
 
 ```env
 TELEGRAM_BOT_TOKEN="<YOUR TOKEN>"
 
-# All options, except `language` will be passed into `whisper.load_model` function. Required fields: `model_name` and `language`
-RECOGNITION_ENGINE_OPTIONS='{"model_name": "small", "language": "ru", "device": "cuda", "download_root": "~/.cache/whisper", "in_memory": False}'
-RECOGNITION_ENGINE="whisper"
+RECOGNITION_ENGINE="faster-whisper"
+# Required fields: `model` and `language`
+RECOGNITION_ENGINE_OPTIONS='{"model": "small", "language": "ru", "device": "cpu", "compute_type": "int8", "beam_size": 5}'
+```
+
+#### Pywhispercpp
+
+
+```env
+TELEGRAM_BOT_TOKEN="<YOUR TOKEN>"
+
+RECOGNITION_ENGINE="pywhispercpp"
+# Required fields: `model` and `language`
+RECOGNITION_ENGINE_OPTIONS='{"model": "small", "language": "ru"}'
 ```
 
 When all required fields configured, you can run application:
@@ -135,36 +154,51 @@ Images can be distributed and will work without extra volumes.
 
 ### Vosk - based
 
-Building with [vosk](https://github.com/alphacep/vosk-api) speech recognition engine:
+Build:
+
+Pass url to vosk model as `MODEL_URL` build arg.
 
 ```
-docker build -f ./images/Dockerfile-vosk-small-ru -t blya-bot-vosk:small-ru .
-docker build -f ./images/Dockerfile-vosk-big-ru -t blya-bot-vosk:big-ru .
+docker build --build-arg MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-ru-0.22.zip" -t blya_bot:vosk -f dockerfiles/vosk.Dockerfile .
 ```
 
-Running:
+Run:
 
 ```
-docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-vosk:small-ru
-docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-vosk:big-ru
+docker run --env TELEGRAM_BOT_TOKEN="..." blya_bot:vosk
 ```
 
-### Whisper - based
+### Faster-Whisper - based
 
-Building with [whisper](https://github.com/openai/whisper) speech recognition engine:
+Build:
 
-```
-docker build -f ./images/Dockerfile-whisper-tiny-ru -t blya-bot-whisper:tiny-ru .
-docker build -f ./images/Dockerfile-whisper-small-ru -t blya-bot-whisper:small-ru .
-```
-
-Running:
+Pass `MODEL` and `LANG` build args.
 
 ```
-docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-whisper:tiny-ru
-docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-whisper:small-ru
+docker build --build-arg MODEL=small --build-arg LANG=ru -t blya_bot:faster-whisper -f dockerfiles/faster-whisper.Dockerfile .
 ```
 
+Run:
+
+```
+docker run --env TELEGRAM_BOT_TOKEN="..." blya_bot:faster-whisper
+```
+
+### Pywhispercpp - based
+
+Build:
+
+Pass `MODEL` and `LANG` build args.
+
+```
+docker build --build-arg MODEL=small --build-arg LANG=ru -t blya_bot:pywhispercpp -f dockerfiles/pywhispercpp.Dockerfile .
+```
+
+Run:
+
+```
+docker run --env TELEGRAM_BOT_TOKEN="..." blya_bot:pywhispercpp
+```
 
 ## TODO
 
@@ -176,7 +210,7 @@ docker run --env TELEGRAM_BOT_TOKEN="..." -p 8080:8080 blya-bot-whisper:small-ru
 - [x] Caching/storing transcriptions
 - [x] Send transcription to chat
 - [ ] Telegram webhook
-- [ ] Configurable "transcribe" commands for bot
+- [x] Configurable "transcribe" commands for bot
 - [ ] Make bot "language independent"
   - [ ] Add other languages support for recognition
   - [ ] Add other languages support for morphological analysis

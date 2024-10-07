@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "blya_bot"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["Alexey Zakharov <dokzlo13@gmail.com>"]
 
@@ -11,15 +11,23 @@ aiohttp = "^3.10.5"
 ahocorapy = "^1.6.1"
 environs = "^11.0.0"
 structlog = "^24.4.0"
-aiogram = "^3.13.0"
-openai-whisper = {git = "https://github.com/openai/whisper.git", optional = true}
-vosk = {version = "^0.3.43", optional = true}
-pydub = {version = "^0.25.1", optional = true}
-pymorphy3 = {version = "^2.0.2", optional = true }
-pymorphy3-dicts-ru = {version = "2.4.417150.4580142", optional = true }
-aiosqlite = "^0.20.0"
-faster-whisper = "^1.0.3"
+aiogram = "^3.13.1"
 ahocorasick-rs = "^0.22.0"
+aiosqlite = "^0.20.0"
+
+# pywhispercpp
+pywhispercpp = { version = "^1.2.0", optional = true }
+
+# faster-whisper
+faster-whisper = { version = "^1.0.3", optional = true }
+
+# vosk
+vosk = { version = "^0.3.43", optional = true }
+pydub = { version = "^0.25.1", optional = true }
+
+# pymorphy
+pymorphy3 = { version = "^2.0.2", optional = true }
+pymorphy3-dicts-ru = { version = "2.4.417150.4580142", optional = true }
 
 [tool.poetry.dev-dependencies]
 flake8 = "^7.1.1"
@@ -27,19 +35,19 @@ flake8-isort = "^6.1.1"
 flake8-bandit = "^4.1.1"
 flake8-bugbear = "^24.8.19"
 flake8-black = "^0.3.6"
-bandit = "^1.7.9"
+bandit = "^1.7.10"
 black = "^24.8.0"
 mypy = "^1.11.2"
 pytest = "^8.3.3"
 pytest-asyncio = "^0.24.0"
-ipython = "^8.27.0"
 memory-profiler = "^0.61.0"
 Pympler = "^1.1"
 
 [tool.poetry.extras]
-whisper = ["whisper"]
+pywhispercpp = ["pywhispercpp"]
+faster-whisper = ["faster-whisper"]
 vosk = ["vosk", "pydub"]
-pymorphy = ["pymorphy2", "pymorphy2-dicts-ru"]
+pymorphy = ["pymorphy3", "pymorphy3-dicts-ru"]
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

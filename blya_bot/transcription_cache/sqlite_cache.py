@@ -67,7 +67,7 @@ class SqliteTranscriptionCache(BaseTranscriptionCache):
         # Perform lazy clean-up of expired entries if TTL is set
         if self.ttl is None:
             return
-        
+
         expiration_threshold = int((datetime.now() - timedelta(seconds=self.ttl)).timestamp())
         logger.debug("Performing cache TTL cleanup", expiration_threshold=expiration_threshold)
         await cursor.execute("DELETE FROM transcription_cache WHERE date_processed <= ?", (expiration_threshold,))

@@ -1,36 +1,15 @@
-import os
-
-import environs
 import structlog
+from environs import Env
 
 logger = structlog.getLogger(__name__)
 
-
-# class Env(environs.Env):
-#     @staticmethod
-#     def read_env(
-#         path: str | None = None,
-#         recurse: bool = True,
-#         verbose: bool = False,
-#         override: bool = False,
-#     ) -> None:
-#         env_files = ("settings.cfg", ".env")
-#         for env_file in env_files:
-#             if os.path.isfile(env_file):
-#                 path = env_file
-#                 logger.info(f"Loading settings file: {path}")
-#                 return environs.Env.read_env(path, recurse, verbose, override)
-
-#         logger.warning("Settings file not found! Using the default values")
-#         return environs.Env.read_env(path, recurse, verbose, override)
-
-Env = environs.Env
-
-AVAILABLE_RECOGNITION_ENGINES = ("whisper", "vosk", "fast-whisper")
+AVAILABLE_RECOGNITION_ENGINES = ("vosk", "pywhispercpp", "faster-whisper")
 
 env = Env()
 env.read_env()
 
+
+TELEGRAM_BOT_TRANSCRIBE_COMMAND = env("TELEGRAM_BOT_TRANSCRIBE_COMMAND", "/t")
 TELEGRAM_BOT_TOKEN = env("TELEGRAM_BOT_TOKEN")
 TELEGRAM_USE_WEBHOOK = env.bool("TELEGRAM_USE_WEBHOOK", False)
 if TELEGRAM_USE_WEBHOOK:
@@ -47,24 +26,24 @@ SERVICE_MY_NERVES_LIMIT = env.int("SERVICE_POLITE_RESPONSE", 5 * 60)
 SERVICE_POLITE_RESPONSE = env("SERVICE_POLITE_RESPONSE", "Бот сломан, больше пяти минут войса ему не переварить")
 SERVICE_IGNORE_FORWARDED = env.bool("SERVICE_IGNORE_FORWARDED", True)
 SERVICE_LOG_LEVEL = env("SERVICE_LOG_LEVEL", "info")
+SERVICE_LOG_COLORS = env.bool("SERVICE_LOG_COLORS", False)
 SERVICE_BAD_WORDS_FILE = env.path("SERVICE_BAD_WORDS_FILE", "./fixtures/bad_words.txt")
 
-RECOGNITION_ENGINE = env("RECOGNITION_ENGINE", "whisper").lower()
+RECOGNITION_ENGINE = env("RECOGNITION_ENGINE").lower()
 if RECOGNITION_ENGINE not in AVAILABLE_RECOGNITION_ENGINES:
-    raise Exception(f"Please choose supported recognition engine: {', '.join(AVAILABLE_RECOGNITION_ENGINES)}")
+    raise Exception(
+        f"Please choose supported recognition engine: {', '.join(AVAILABLE_RECOGNITION_ENGINES)}, not {RECOGNITION_ENGINE!r}"
+    )
 RECOGNITION_ENGINE_OPTIONS = env.json("RECOGNITION_ENGINE_OPTIONS", "{}")
 
 if RECOGNITION_ENGINE == "vosk":
     if RECOGNITION_ENGINE_OPTIONS.get("model_path") is None:
-        raise Exception("Please provide 'model_path' option in 'RECOGNITION_ENGINE_OPTIONS' env")
-elif RECOGNITION_ENGINE == "whisper":
-    if RECOGNITION_ENGINE_OPTIONS.get("model_name") is None:
-        raise Exception("Please provide 'model_name' option in 'RECOGNITION_ENGINE_OPTIONS' env")
-elif RECOGNITION_ENGINE == "fast-whisper":
-    if RECOGNITION_ENGINE_OPTIONS.get("model_name") is None:
-        raise Exception("Please provide 'model_name' option in 'RECOGNITION_ENGINE_OPTIONS' env")
+        raise Exception("Please provide 'model_path' option in 'RECOGNITION_ENGINE_OPTIONS' config")
 
-HEALTH_CHECK_HOST = env("HEALTH_CHECK_HOST", "0.0.0.0")
+elif RECOGNITION_ENGINE in ("pywhispercpp", "faster-whisper") and RECOGNITION_ENGINE_OPTIONS.get("model") is None:
+    raise Exception("Please provide 'model' option in 'RECOGNITION_ENGINE_OPTIONS' config")
+
+HEALTH_CHECK_HOST = env("HEALTH_CHECK_HOST", "0.0.0.0")  # noqa: S104
 HEALTH_CHECK_PORT = env.int("HEALTH_CHECK_PORT", 8080)
 HEALTH_CHECK_PATH = env("HEALTH_CHECK_PATH", "/health/live")
 

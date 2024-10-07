@@ -1,13 +1,14 @@
 import asyncio
 import io
 import json
-import threading
 import wave
+from concurrent.futures import ThreadPoolExecutor
 from typing import Generator
 
 import structlog
 
-from .interface import MediaType, BaseSpeechRecognizer, TempFile
+from .interface import BaseSpeechRecognizer, TempFile
+from .utils import async_wrap_iter
 
 logger = structlog.getLogger(__name__)
 
@@ -19,50 +20,24 @@ except ImportError:
     raise
 
 
-# TODO: make converter really async
-def convert_audio(input_buf: io.IOBase, format: str) -> io.BytesIO:
-    input_buf.seek(0)
-    audio: pydub.AudioSegment = pydub.AudioSegment.from_file(input_buf, format=format)
-    audio = audio.set_channels(1)
-    audio = audio.set_sample_width(2)
-
-    wav_buf = io.BytesIO()
-    audio.export(format="wav", out_f=wav_buf)
-    wav_buf.seek(0)
-    return wav_buf
-
-
-def async_wrap_iter(it):
-    """Wrap blocking iterator into an asynchronous one"""
+async def convert_audio_async(input_buf: io.IOBase) -> io.BytesIO:
     loop = asyncio.get_event_loop()
-    q = asyncio.Queue(1)
-    exception = None
-    _END = object()
 
-    async def yield_queue_items():
-        while True:
-            next_item = await q.get()
-            if next_item is _END:
-                break
-            yield next_item
-        if exception is not None:
-            # the iterator has raised, propagate the exception
-            raise exception
+    # Define the blocking task as a helper function
+    def convert_audio(input_buf: io.IOBase) -> io.BytesIO:
+        input_buf.seek(0)
+        audio: pydub.AudioSegment = pydub.AudioSegment.from_file(input_buf)
+        audio = audio.set_channels(1)
+        audio = audio.set_sample_width(2)
 
-    def iter_to_queue():
-        nonlocal exception
-        try:
-            for item in it:
-                # This runs outside the event loop thread, so we
-                # must use thread-safe API to talk to the queue.
-                asyncio.run_coroutine_threadsafe(q.put(item), loop).result()
-        except Exception as e:
-            exception = e
-        finally:
-            asyncio.run_coroutine_threadsafe(q.put(_END), loop).result()
+        wav_buf = io.BytesIO()
+        audio.export(format="wav", out_f=wav_buf)
+        wav_buf.seek(0)
+        return wav_buf
 
-    threading.Thread(target=iter_to_queue).start()
-    return yield_queue_items()
+    # Run the blocking code in a separate thread
+    with ThreadPoolExecutor() as pool:
+        return await loop.run_in_executor(pool, convert_audio, input_buf)
 
 
 class VoskSpeechRecognizer(BaseSpeechRecognizer):
@@ -102,10 +77,6 @@ class VoskSpeechRecognizer(BaseSpeechRecognizer):
         del wf
 
     async def recognize(self, file: TempFile) -> str:
-        format_map = {
-            MediaType.VIDEO_NOTE: "mp4",
-            MediaType.VOICE: "ogg",
-        }
-        wav_buf = convert_audio(file.file, format_map[media_type]) # FIXME
+        wav_buf = await convert_audio_async(file.file)  # type: ignore
         parts = [part async for part in async_wrap_iter(self._recognize(wav_buf))]
         return "".join(parts)

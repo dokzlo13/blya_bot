@@ -69,66 +69,47 @@ async def make_cache() -> BaseTranscriptionCache:
 
 
 async def _main(stop_event: asyncio.Event, loop):
-    configure_logging(settings.SERVICE_LOG_LEVEL)
+    configure_logging(log_level=settings.SERVICE_LOG_LEVEL, console_colors=settings.SERVICE_LOG_COLORS)
+    logger.info("Logging configured", log_level=settings.SERVICE_LOG_LEVEL, console_colors=settings.SERVICE_LOG_COLORS)
 
     logger.info("Creating bot core...")
-
     cache = await make_cache()
     await cache.setup()
     bot_core = BotCore(load_recognition_core(), load_word_counter(), cache=cache)
     logger.info("Bot core assembled")
 
     logger.info("Starting bot...")
+    logger.info("Using bot token", token=f"{settings.TELEGRAM_BOT_TOKEN[:5]}...{settings.TELEGRAM_BOT_TOKEN[-5:]}")
+    logger.info("Transcribe command", transcribe_command=settings.TELEGRAM_BOT_TRANSCRIBE_COMMAND)
     async with async_health_check_server(
-        lambda: True, settings.HEALTH_CHECK_HOST, settings.HEALTH_CHECK_PORT, settings.HEALTH_CHECK_PATH, loop=loop
+        lambda: True,
+        settings.HEALTH_CHECK_HOST,
+        settings.HEALTH_CHECK_PORT,
+        settings.HEALTH_CHECK_PATH,
+        loop=loop,
     ):
-        bot, dispatcher = build_bot(settings.TELEGRAM_BOT_TOKEN, bot_core)
+        bot, dispatcher = build_bot(
+            settings.TELEGRAM_BOT_TOKEN, bot_core, transcribe_command=settings.TELEGRAM_BOT_TRANSCRIBE_COMMAND,
+        )
 
-        # Hacking executor, to work inside current running loop
-        # ex = executor.Executor(dispatcher=dispatcher, skip_updates=True, loop=loop)
+        # FIXME: aiogram configures logging and override our setting, so here we hacking it by setting config again.
+        configure_logging(log_level=settings.SERVICE_LOG_LEVEL, console_colors=settings.SERVICE_LOG_COLORS)
 
-        # async def master_task():
-        #     ex._prepare_polling()
-        #     await ex._startup_polling()
-        #     try:
-        #         await ex.dispatcher.start_polling(
-        #             reset_webhook=None, timeout=20, relax=0.1, fast=True, allowed_updates=None
-        #         )
-        #     finally:
-        #         await ex._shutdown_polling()
-
-        await dispatcher.start_polling(bot)
-
-        # task = asyncio.create_task()
-        # await stop_event.wait()
+        task = asyncio.create_task(dispatcher.start_polling(bot, handle_signals=False))
+        # TODO: Better state management/failfast
+        await stop_event.wait()
         await cache.teardown()
 
-        # if not task.done():
-        #     task.cancel()
+        if not task.done():
+            task.cancel()
 
-        # try:
-        #     await task
-        # except asyncio.CancelledError:
-        #     logger.warning(f"Task {task.get_name()!r} terminated")
-
-
-# def _main():
-#     configure_logging(settings.SERVICE_LOG_LEVEL)
-
-#     logger.info("Creating bot core...")
-#     bot_core = BotCore(load_recognition_core(), load_word_counter(), cache=InMemoryTranscriptionCache())
-#     logger.info("Bot core assembled")
-
-#     logger.info("Starting bot...")
-#     with health_check_server(
-#         lambda: True, settings.HEALTH_CHECK_HOST, settings.HEALTH_CHECK_PORT, settings.HEALTH_CHECK_PATH
-#     ):
-#         dispatcher = build_bot(settings.TELEGRAM_BOT_TOKEN, bot_core)
-#         executor.start_polling(dispatcher, skip_updates=True)
+        try:
+            await task
+        except asyncio.CancelledError:
+            logger.warning(f"Task {task.get_name()!r} terminated")
 
 
 def main():
-
     loop = asyncio.new_event_loop()
 
     stop_event = asyncio.Event()

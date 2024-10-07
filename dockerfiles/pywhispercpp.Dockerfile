@@ -1,15 +1,22 @@
-# syntax = docker/dockerfile:1.0-experimental
+# syntax=docker/dockerfile:1
 
-FROM python:3.10.8-slim-buster
+FROM python:3.12.7-bookworm
+
+ARG MODEL="small"
+# ENV MODEL=$MODEL
+
+ARG LANG="ru"
+# ENV LANG=$LANG
 
 ARG ENVIRONMENT
 ENV ENVIRONMENT=${ENVIRONMENT:-production}
+
 ENV PYTHONUNBUFFERED=1
 
 RUN mkdir -p /app/models
 WORKDIR /app
 
-RUN pip install --upgrade pip && pip install -U pip poetry==1.2.2
+RUN pip install --upgrade pip && pip install -U pip poetry==1.8.3
 RUN poetry config virtualenvs.create false
 
 RUN apt-get update && apt-get install --no-install-recommends --yes \
@@ -21,19 +28,17 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
 
 RUN wget -P /usr/local/share/ca-certificates/cacert.org http://www.cacert.org/certs/root.crt http://www.cacert.org/certs/class3.crt && update-ca-certificates
 
-# TODO: Get downloand link dynamically?
-RUN wget -O /app/models/small.pt https://openaipublic.azureedge.net/main/whisper/models/65147644a518d12f04e32d6f3b26facc3f8dd46e5390956a9424a650c0ce22b9/tiny.pt
-
 COPY poetry.lock /app
 COPY pyproject.toml /app
 
-RUN poetry install --no-dev --no-root -E "whisper" -E "pymorphy" \
+RUN poetry install --no-dev --no-root -E "pywhispercpp" -E "pymorphy" \
     && if [ "$ENVIRONMENT" = "development" ]; then poetry install --all-extras ; fi
-# I have some issues with installing whisper with poetry during build, so here we forcing installation by using pip
-RUN pip install whisper
 
-ENV RECOGNITION_ENGINE="whisper"
-ENV RECOGNITION_ENGINE_OPTIONS='{"model_name": "tiny", "language": "ru", "download_root": "/app/models", "device": "cpu"}'
+ADD utils /app/utils
+RUN python /app/utils/pull_whispercpp_model.py -m ${MODEL}
+
+ENV RECOGNITION_ENGINE="pywhispercpp"
+ENV RECOGNITION_ENGINE_OPTIONS="{\"model\": \"${MODEL}\", \"language\": \"${LANG}\"}"
 
 ADD fixtures /app/fixtures
 ADD blya_bot /app/blya_bot

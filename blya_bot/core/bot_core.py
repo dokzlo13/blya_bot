@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from tempfile import _TemporaryFileWrapper as TempFile
 from datetime import datetime
+from tempfile import _TemporaryFileWrapper as TempFile
 from time import time
 
 import structlog
 from aiogram import types
 
 from blya_bot.models import TextSummary, TranscriptionData
-from blya_bot.recognition import BaseSpeechRecognizer, MediaType
+from blya_bot.recognition import BaseSpeechRecognizer
 from blya_bot.transcription_cache import BaseTranscriptionCache
 from blya_bot.word_count import BaseWordCounter
 
@@ -36,7 +36,7 @@ class BotCore:
     def calculate_summary(self, text: str) -> TextSummary:
         logger.debug("Counting words")
         start_time = time()
-        summary = self.word_counter.calculate_summary(text)
+        summary = self.word_counter.calculate_summary(text.lower())  # TODO: Maybe better text preparation for counting
         logger.debug("Words counted", elapsed_time=f"{time()-start_time:.4f}sec.")
         return summary
 
@@ -49,8 +49,6 @@ class BotCore:
 
         transcribed_text = await self.transcribe_text(file)
         summary = self.calculate_summary(transcribed_text)
-        # print(transcribed_text)
-        # print(summary)
         data = TranscriptionData(
             transcription=transcribed_text,
             summary=summary,
@@ -61,18 +59,3 @@ class BotCore:
             await self.cache.store(unique_id, data)
             logger.debug("Transcription stored to cache")
         return data
-
-    @staticmethod
-    def get_media(
-        message: types.Message,
-    ) -> tuple[types.Voice | types.VideoNote, MediaType]:
-        if message.video_note:
-            file_obj = message.video_note
-            media_type = MediaType.VIDEO_NOTE
-        elif message.voice:
-            file_obj = message.voice
-            media_type = MediaType.VOICE
-        else:
-            # Unreachable
-            raise Exception("Can't extract media")
-        return file_obj, media_type
