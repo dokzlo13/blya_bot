@@ -1,0 +1,28 @@
+spec:
+  ingress: {}
+  name: blya-bot-app
+  workers:
+  - dockerfile_path: Dockerfile
+    envs:
+    - key: TELEGRAM_BOT_TOKEN
+      value: "telegram-token"
+      type: SECRET
+    - key: HEALTH_CHECK_PORT
+      scope: RUN_TIME
+      value: "8080"
+    - key: HEALTH_CHECK_PATH
+      scope: RUN_TIME
+      value: /health/live
+    - key: HEALTH_CHECK_PORT
+      scope: RUN_TIME
+      value: "8080"
+    - key: CACHE_ENGINE
+      scope: RUN_TIME
+      value: memory
+    github:
+      branch: master
+      deploy_on_push: true
+      repo: dokzlo13/blya_bot
+    instance_count: 1
+    name: blya-bot
+    source_dir: /

@@ -27,10 +27,6 @@ class TelegramViews:
         if message.reply_to_message is None:
             return
 
-        # if message.forward_from is not None and settings.SERVICE_IGNORE_FORWARDED:
-        #     logger.info("Forwarded audio skipped", message_id=message.message_id, chat_id=message.chat.id)
-        #     return
-
         message = message.reply_to_message
         if message.voice is None:
             return
@@ -49,10 +45,6 @@ class TelegramViews:
     async def handle_video_note_reply(self, message: types.Message):
         if message.reply_to_message is None:
             return
-
-        # if message.forward_from is not None and settings.SERVICE_IGNORE_FORWARDED:
-        #     logger.info("Forwarded audio skipped", message_id=message.message_id, chat_id=message.chat.id)
-        #     return
 
         message = message.reply_to_message
         if message.video_note is None:
