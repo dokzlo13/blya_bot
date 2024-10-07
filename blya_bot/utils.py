@@ -5,12 +5,35 @@ Split = namedtuple("Split", "pos, sep")
 Separator = namedtuple("Separator", "idx, value, length")
 
 
-def highlight_text(text: str, markup: dict[tuple[int, int], str], highlight: tuple[str, str] = ("<b>", "</b>")) -> str:
+# def highlight_text(text: str, markup: dict[tuple[int, int], str], highlight: tuple[str, str] = ("<b>", "</b>")) -> str:
+#     highlighted_text = ""
+#     prev_end = 0
+#     for (start, end), word in markup.items():
+#         highlighted_text += text[prev_end:start] + highlight[0] + word.upper() + highlight[1]
+#         prev_end = end
+#     return highlighted_text
+
+
+def highlight_text(
+    text: str, markup: list[tuple[tuple[int, int], str]], highlight: tuple[str, str] = ("<b>", "</b>")
+) -> str:
     highlighted_text = ""
     prev_end = 0
-    for (start, end), word in markup.items():
-        highlighted_text += text[prev_end:start] + highlight[0] + word.upper() + highlight[1]
+
+    # Sort the markup to ensure correct order of processing
+    markup.sort(key=lambda x: x[0][0])
+
+    for (start, end), word in markup:
+        # Add text from previous end to the current start
+        highlighted_text += text[prev_end:start]
+        # Add highlighted word
+        highlighted_text += highlight[0] + word.upper() + highlight[1]
+        # Move the prev_end to the current end
         prev_end = end
+
+    # Add any remaining text after the last markup
+    highlighted_text += text[prev_end:]
+
     return highlighted_text
 
 
