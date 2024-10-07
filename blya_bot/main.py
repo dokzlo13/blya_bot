@@ -58,7 +58,7 @@ async def make_cache() -> BaseTranscriptionCache:
         logger.info("Cache engine loaded", ttl=ttl, engine="InMemoryTranscriptionCache")
     elif settings.CACHE_ENGINE == "sqlite":
         db_path = settings.CACHE_PARAMS["db_path"]
-        ttl = settings.CACHE_PARAMS.get("ttl", None)
+        ttl = settings.CACHE_PARAMS["ttl"]
         conn = await aiosqlite.connect(db_path)
         cache = SqliteTranscriptionCache(conn, ttl)
         logger.info("Cache engine loaded", db_path=db_path, ttl=ttl, engine="SqliteTranscriptionCache")
