@@ -2,25 +2,29 @@ import warnings
 
 import structlog
 
-from .entry import DictEntry
+from blya_bot.dictionary.entry import DictEntry
+
 from .interface import IDictionaryModifier
 
 logger = structlog.getLogger(__name__)
 
 
 class PyMorphyRuDictModifier(IDictionaryModifier):
-    def __init__(self, morph=None) -> None:
+    def __init__(self, morph=None) -> None:  # noqa: ANN001
         if morph:
             self.morph = morph
         else:
             try:
-                import pymorphy3
-                import pymorphy3_dicts_ru
+                import pymorphy3  # noqa: PLC0415
+                import pymorphy3_dicts_ru  # noqa: PLC0415
 
                 self.morph = pymorphy3.MorphAnalyzer(path=pymorphy3_dicts_ru.get_path())
 
             except ImportError:
-                warnings.warn("Morphological extension is not available, install 'pymorphy3' and 'pymorphy3-dicts-ru'")
+                warnings.warn(
+                    "Morphological extension is not available, install 'pymorphy3' and 'pymorphy3-dicts-ru'",
+                    stacklevel=2,
+                )
                 raise
 
     def modify_dict(self, dictionary: list[DictEntry]) -> list[DictEntry]:
@@ -45,3 +49,4 @@ class PyMorphyRuDictModifier(IDictionaryModifier):
                 ext_dictionary.append(DictEntry(word=word, flags=entry.flags, parent=entry))
 
         return list(set(ext_dictionary))
+

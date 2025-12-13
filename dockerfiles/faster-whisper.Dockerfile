@@ -1,42 +1,67 @@
 # syntax=docker/dockerfile:1
 
-FROM python:3.12.7-bookworm
+# =============================================================================
+# Stage 1: Build dictionary with morphing
+# =============================================================================
+FROM python:3.13-bookworm AS dictgen
+
+WORKDIR /build
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
+
+# Copy source files needed for dictgen
+COPY blya_bot/ /build/blya_bot/
+COPY dictgen/ /build/dictgen/
+COPY fixtures/bad_words.txt /build/fixtures/
+
+# Install blya_bot and dictgen, then generate packed dictionary
+RUN uv pip install --system /build/blya_bot/ /build/dictgen/
+RUN python -m dictgen -i /build/fixtures/bad_words.txt -o /build/fixtures/dict.bb --morphing
+
+# =============================================================================
+# Stage 2: Runtime
+# =============================================================================
+FROM python:3.13-bookworm
 
 ARG MODEL="small"
 ARG LANG="ru"
+ARG DEVICE="cpu"
+ARG COMPUTE_TYPE="int8"
+ARG BEAM_SIZE=5
 ARG ENVIRONMENT
+
 ENV ENVIRONMENT=${ENVIRONMENT:-production}
 ENV PYTHONUNBUFFERED=1
 
 RUN mkdir -p /app/models
 WORKDIR /app
 
-RUN pip install --upgrade pip && pip install -U pip poetry==1.8.3
-RUN poetry config virtualenvs.create false
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     wget \
     ffmpeg \
+    tini \
     # Required for git-based python packages installations (whisper)
     git \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget -P /usr/local/share/ca-certificates/cacert.org http://www.cacert.org/certs/root.crt http://www.cacert.org/certs/class3.crt && update-ca-certificates
 
-COPY poetry.lock /app
-COPY pyproject.toml /app
-
-RUN poetry install --no-dev --no-root -E "faster-whisper" -E "pymorphy" \
-    && if [ "$ENVIRONMENT" = "development" ]; then poetry install --all-extras ; fi
+# Copy blya_bot package and install
+COPY blya_bot/ /app/blya_bot/
+RUN uv pip install --system "/app/blya_bot/[faster-whisper]"
 
 ADD utils /app/utils
 RUN python /app/utils/pull_faster_whisper_model.py -m ${MODEL}
 
-ENV RECOGNITION_ENGINE="faster-whisper"
-ENV RECOGNITION_ENGINE_OPTIONS="{\"model\": \"${MODEL}\", \"language\": \"${LANG}\", \"device\": \"cpu\", \"compute_type\": \"int8\", \"beam_size\": 5}"
+# Settings use nested format with __ delimiter
+ENV RECOGNITION__ENGINE="faster-whisper"
+ENV RECOGNITION__ENGINE_OPTIONS="{\"model\": \"${MODEL}\", \"language\": \"${LANG}\", \"device\": \"${DEVICE}\", \"compute_type\": \"${COMPUTE_TYPE}\", \"beam_size\": ${BEAM_SIZE}}"
 
-ADD fixtures /app/fixtures
-ADD blya_bot /app/blya_bot
+# Copy pre-built dictionary from dictgen stage
+COPY --from=dictgen /build/fixtures/dict.bb /app/fixtures/dict.bb
 
 ENV PATH="/app:${PATH}"
+
+ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python", "-m", "blya_bot"]

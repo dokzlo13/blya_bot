@@ -19,6 +19,10 @@ class BaseTranscriptionCache(Protocol):
     async def teardown(self):
         pass
 
+    async def clean(self) -> int:
+        """Remove expired entries from the cache. Returns number of deleted entries."""
+        return 0
+
 
 class NullTranscriptionCache(BaseTranscriptionCache):
     async def store(self, file_unique_id: str, transcription_data: TranscriptionData):
@@ -32,3 +36,6 @@ class NullTranscriptionCache(BaseTranscriptionCache):
 
     async def teardown(self):
         pass
+
+    async def clean(self) -> int:
+        return 0

@@ -1,5 +1,5 @@
 import asyncio
-from contextlib import contextmanager, asynccontextmanager
+from contextlib import asynccontextmanager, contextmanager
 from typing import Callable
 
 import structlog
@@ -21,7 +21,7 @@ def handler(callback: Callable):
                 is_ok = callback()
         except Exception as e:
             logger.error(e)
-            return web.json_response({"ok": False, "message": e}, status=422)
+            return web.json_response({"ok": False, "message": str(e)}, status=422)
 
         if is_ok:
             return web.json_response({"ok": True}, status=200)
@@ -33,6 +33,32 @@ def handler(callback: Callable):
 
 def add_health_check_probe(app: web.Application, probe_fn, path="/health/live"):
     app.add_routes([web.get(path, handler(probe_fn))])
+
+
+async def run_health_check_server(
+    probe_fn: Callable,
+    host: str,
+    port: int,
+    path: str,
+    stop_event: asyncio.Event,
+) -> None:
+    """Run health check server until stop_event is set."""
+    app = web.Application()
+    add_health_check_probe(app, probe_fn, path=path)
+
+    runner = web.AppRunner(app)
+    await runner.setup()
+
+    site = web.TCPSite(runner, host, port)
+    await site.start()
+    logger.info("Health check server started", host=host, port=port, path=path)
+
+    try:
+        await stop_event.wait()
+    finally:
+        logger.info("Stopping health check server...")
+        await runner.cleanup()
+        logger.info("Health check server stopped")
 
 
 @contextmanager

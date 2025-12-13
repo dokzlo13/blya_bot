@@ -8,8 +8,8 @@ from aiogram.enums import ParseMode
 
 from blya_bot.models.models import TranscriptionData
 
-from . import settings
 from .core import BotCore
+from .settings import ServiceSettings, get_settings
 from .utils import highlight_text, split_in_chunks
 from .word_count.utils import count_words_total
 
@@ -17,9 +17,10 @@ logger = structlog.getLogger(__name__)
 
 
 class TelegramViews:
-    def __init__(self, core: BotCore, bot: Bot) -> None:
+    def __init__(self, core: BotCore, bot: Bot, service_settings: ServiceSettings) -> None:
         self.core = core
         self.bot = bot
+        self.service = service_settings
 
     # - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
 
@@ -31,12 +32,12 @@ class TelegramViews:
         if message.voice is None:
             return
 
-        if message.forward_from is not None and settings.SERVICE_IGNORE_FORWARDED:
+        if message.forward_from is not None and self.service.ignore_forwarded:
             logger.info("Forwarded audio skipped", message_id=message.message_id, chat_id=message.chat.id)
             return
 
-        if message.voice.duration > settings.SERVICE_MY_NERVES_LIMIT:
-            return await message.reply(settings.SERVICE_MY_NERVES_LIMIT)
+        if message.voice.duration > self.service.my_nerves_limit:
+            return await message.reply(self.service.polite_response)
 
         with structlog.contextvars.bound_contextvars(message_id=message.message_id, chat_id=message.chat.id):
             data = await self.transcribe_media(message.voice.file_id, message.voice.file_unique_id)
@@ -60,12 +61,12 @@ class TelegramViews:
         if message.voice is None:
             return
 
-        if message.forward_from is not None and settings.SERVICE_IGNORE_FORWARDED:
+        if message.forward_from is not None and self.service.ignore_forwarded:
             logger.info("Forwarded audio skipped", message_id=message.message_id, chat_id=message.chat.id)
             return
 
-        if message.voice.duration > settings.SERVICE_MY_NERVES_LIMIT:
-            return await message.reply(settings.SERVICE_MY_NERVES_LIMIT)
+        if message.voice.duration > self.service.my_nerves_limit:
+            return await message.reply(self.service.polite_response)
 
         with structlog.contextvars.bound_contextvars(message_id=message.message_id, chat_id=message.chat.id):
             data = await self.transcribe_media(message.voice.file_id, message.voice.file_unique_id)
@@ -123,10 +124,18 @@ class TelegramViews:
             await message.reply(msg_part, parse_mode=ParseMode.HTML)
 
 
-def build_bot(bot_token, bot_core: BotCore, transcribe_command: str = "/transcribe") -> tuple[Bot, Dispatcher]:
+def build_bot(
+    bot_token: str,
+    bot_core: BotCore,
+    transcribe_command: str = "/transcribe",
+    service_settings: ServiceSettings | None = None,
+) -> tuple[Bot, Dispatcher]:
+    if service_settings is None:
+        service_settings = get_settings().service
+
     bot = Bot(token=bot_token)
     dp = Dispatcher()
-    views = TelegramViews(bot_core, bot)
+    views = TelegramViews(bot_core, bot, service_settings)
 
     dp.message(F.voice.is_not(None))(views.handle_voice)
     dp.message(F.video_note.is_not(None))(views.handle_video_note)

@@ -2,7 +2,7 @@ from abc import abstractmethod
 from pathlib import Path
 from typing import Protocol
 
-from .entry import DictEntry
+from blya_bot.dictionary.entry import DictEntry
 
 
 class IDictionaryLoader(Protocol):
@@ -15,3 +15,4 @@ class IDictionaryModifier(Protocol):
     @abstractmethod
     def modify_dict(self, dictionary: list[DictEntry]) -> list[DictEntry]:
         pass
+

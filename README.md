@@ -1,8 +1,11 @@
 # blya_bot
 
-[![Deploy to DigitalOcean](https://www.deploytodo.com/do-btn-blue.svg)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/dokzlo13/blya_bot/tree/master/)
+[![Build Docker Images](https://github.com/dokzlo13/blya_bot/actions/workflows/docker-publish.yml/badge.svg)](https://github.com/dokzlo13/blya_bot/actions/workflows/docker-publish.yml)
+[![Python 3.13+](https://img.shields.io/badge/python-3.13+-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![GitHub release](https://img.shields.io/github/v/release/dokzlo13/blya_bot?include_prereleases)](https://github.com/dokzlo13/blya_bot/releases)
+[![Deploy to DO](https://img.shields.io/badge/Deploy-DigitalOcean-0080FF?logo=digitalocean)](https://cloud.digitalocean.com/apps/new?repo=https://github.com/dokzlo13/blya_bot/tree/master/)
 
----
 
 > Blya - Russian expletive "shit" (figuratively). Pronounced like "bla", but with a softer "L". It's what you might say if your car won't start in the morning, and you're going to be late for work. [urbandictionary](https://www.urbandictionary.com/define.php?term=blya)
 
@@ -61,17 +64,56 @@ If you want to try this bot with other language, just remove `pymorphy2` and `py
 
 ## Build & Run
 
-### Install app dependencies
+### Prerequisites
 
-You can install blya-bot locally, with [poetry](https://python-poetry.org/):
+Install [uv](https://docs.astral.sh/uv/) package manager:
 ```bash
-$ # Virtualenv recommended:
-$ python3 -m venv ./.venv
-$ ./.venv/bin/activate
-$ # Install Poetry, if you don't have it
-$ pip install poetry
-$ # Install blya-bot dependencies
-$ poetry install --no-root --all-extras
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+### Running Locally (Manual Setup)
+
+The project consists of two packages:
+- `dictgen/` — Dictionary generator with morphological expansion
+- `blya_bot/` — The Telegram bot itself
+
+**Step 1: Generate the dictionary**
+
+First, generate the packed dictionary file with morphological word forms:
+
+```bash
+cd dictgen
+uv sync
+uv run -m dictgen -i ../fixtures/bad_words.txt -o ../fixtures/dict.bb --morphing
+```
+
+This reads the DSL dictionary from `fixtures/bad_words.txt`, applies morphological expansion, and saves the packed binary dictionary to `fixtures/dict.bb`.
+
+**Step 2: Configure and run the bot**
+
+```bash
+cd blya_bot
+uv sync --all-extras  # Install with all speech recognition engines
+# Or install with specific engine only:
+# uv sync --extra vosk
+# uv sync --extra faster-whisper
+
+# Create .env file with your configuration (see Configuration section below)
+# Then run:
+uv run -m blya_bot
+```
+
+### dictgen CLI Reference
+
+```
+usage: python -m dictgen [-h] -i INPUT -o OUTPUT [-c {zstd,none}] [--morphing | --no-morphing]
+
+Options:
+  -i, --input         Path to DSL dictionary text file (required)
+  -o, --output        Output packed file path (required)
+  -c, --compression   Compression type: zstd (default) or none
+  --morphing          Enable morphological expansion (default)
+  --no-morphing       Disable morphological expansion
 ```
 
 ### Obtaining speech recognition models
@@ -139,10 +181,11 @@ RECOGNITION_ENGINE="pywhispercpp"
 RECOGNITION_ENGINE_OPTIONS='{"model": "small", "language": "ru"}'
 ```
 
-When all required fields configured, you can run application:
+When all required fields configured, run the bot:
 
 ```bash
-$ python main.py # or python -m blya_bot
+cd blya_bot
+uv run -m blya_bot
 ```
 
 ## Docker images

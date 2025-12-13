@@ -1,9 +1,12 @@
-from datetime import datetime, timedelta
-import aiosqlite
 import json
-from blya_bot.models import TranscriptionData
-from .interface import BaseTranscriptionCache
+from datetime import datetime, timedelta
+
+import aiosqlite
 import structlog
+
+from blya_bot.models import TranscriptionData
+
+from .interface import BaseTranscriptionCache
 
 logger = structlog.getLogger(__name__)
 
@@ -63,25 +66,23 @@ class SqliteTranscriptionCache(BaseTranscriptionCache):
                 return self._parse_row_to_data(row)
         return None
 
-    async def _clean_expired_entries(self, cursor):
-        # Perform lazy clean-up of expired entries if TTL is set
+    async def clean(self) -> int:
+        """Remove expired entries from the cache. Returns number of deleted entries."""
         if self.ttl is None:
-            return
+            return 0
 
         expiration_threshold = int((datetime.now() - timedelta(seconds=self.ttl)).timestamp())
-        logger.debug("Performing cache TTL cleanup", expiration_threshold=expiration_threshold)
-        await cursor.execute("DELETE FROM transcription_cache WHERE date_processed <= ?", (expiration_threshold,))
-
-        # Get the number of rows deleted
-        deleted_rows = cursor.rowcount
-        if deleted_rows > 0:
-            logger.info(f"Deleted {deleted_rows} old cache entries.")
-
-    async def store(self, file_unique_id: str, transcription_data: TranscriptionData):
-        # Clean expired entries before storing a new entry
 
         async with self.conn.cursor() as cursor:
-            await self._clean_expired_entries(cursor)
+            await cursor.execute("DELETE FROM transcription_cache WHERE date_processed <= ?", (expiration_threshold,))
+            deleted_rows = cursor.rowcount
+
+        await self.conn.commit()
+
+        return deleted_rows
+
+    async def store(self, file_unique_id: str, transcription_data: TranscriptionData):
+        async with self.conn.cursor() as cursor:
             # Store the new transcription data
             await cursor.execute(
                 "INSERT INTO transcription_cache VALUES (?, ?, ?, ?)", self._data_as_params(transcription_data)

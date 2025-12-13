@@ -18,46 +18,58 @@ RUN uv pip install --system /build/blya_bot/ /build/dictgen/
 RUN python -m dictgen -i /build/fixtures/bad_words.txt -o /build/fixtures/dict.bb --morphing
 
 # =============================================================================
-# Stage 2: Runtime
+# Stage 2: Runtime with CUDA support
 # =============================================================================
-FROM python:3.13-bookworm
+FROM nvidia/cuda:12.3.2-cudnn9-runtime-ubuntu22.04
 
 ARG MODEL="small"
 ARG LANG="ru"
+ARG DEVICE="cuda"
+ARG COMPUTE_TYPE="float16"
+ARG BEAM_SIZE=5
 ARG ENVIRONMENT
+
 ENV ENVIRONMENT=${ENVIRONMENT:-production}
 ENV PYTHONUNBUFFERED=1
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Required for NVIDIA container runtime
+ENV NVIDIA_VISIBLE_DEVICES=all
+ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
 RUN mkdir -p /app/models
 WORKDIR /app
 
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
+# Install minimal dependencies
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     wget \
     ffmpeg \
     tini \
-    # Required for git-based python packages installations (whisper)
     git \
+    ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-RUN wget -P /usr/local/share/ca-certificates/cacert.org http://www.cacert.org/certs/root.crt http://www.cacert.org/certs/class3.crt && update-ca-certificates
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
-# Copy blya_bot package and install
+# Install Python 3.13 via uv
+RUN uv python install 3.13
+RUN uv venv --python 3.13 /app/.venv
+
+# Copy blya_bot package and install with faster-whisper extra
 COPY blya_bot/ /app/blya_bot/
-RUN uv pip install --system "/app/blya_bot/[pywhispercpp]"
+RUN uv pip install --python /app/.venv/bin/python "/app/blya_bot/[faster-whisper]"
 
 ADD utils /app/utils
-RUN python /app/utils/pull_whispercpp_model.py -m ${MODEL}
+RUN /app/.venv/bin/python /app/utils/pull_faster_whisper_model.py -m ${MODEL}
 
 # Settings use nested format with __ delimiter
-ENV RECOGNITION__ENGINE="pywhispercpp"
-ENV RECOGNITION__ENGINE_OPTIONS="{\"model\": \"${MODEL}\", \"language\": \"${LANG}\"}"
+ENV RECOGNITION__ENGINE="faster-whisper"
+ENV RECOGNITION__ENGINE_OPTIONS="{\"model\": \"${MODEL}\", \"language\": \"${LANG}\", \"device\": \"${DEVICE}\", \"compute_type\": \"${COMPUTE_TYPE}\", \"beam_size\": ${BEAM_SIZE}}"
 
 # Copy pre-built dictionary from dictgen stage
 COPY --from=dictgen /build/fixtures/dict.bb /app/fixtures/dict.bb
 
-ENV PATH="/app:${PATH}"
+ENV PATH="/app/.venv/bin:/app:${PATH}"
 
 ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["python", "-m", "blya_bot"]

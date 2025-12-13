@@ -2,8 +2,13 @@ from __future__ import annotations
 
 from time import time
 
+import structlog
+
 from blya_bot.models import TranscriptionData
+
 from .interface import BaseTranscriptionCache
+
+logger = structlog.getLogger(__name__)
 
 
 class InMemoryTranscriptionCache(BaseTranscriptionCache):
@@ -18,7 +23,7 @@ class InMemoryTranscriptionCache(BaseTranscriptionCache):
         return value
 
     async def store(self, file_unique_id: str, transcription_data: TranscriptionData):
-        self.clean()
+        await self.clean()
 
         if file_unique_id in self._cache:
             self._pop(file_unique_id)
@@ -27,20 +32,22 @@ class InMemoryTranscriptionCache(BaseTranscriptionCache):
         self._expiration[file_unique_id] = time() + self._ttl
 
     async def get(self, file_unique_id: str) -> TranscriptionData | None:
-        self.clean()
+        await self.clean()
 
         return self._cache.get(file_unique_id, None)
 
-    def clean(self) -> None:
+    async def clean(self) -> int:
         expired_keys = []
+        current_time = time()
         for key, expiration_time in self._expiration.items():
-            if time() > expiration_time:
+            if current_time > expiration_time:
                 expired_keys.append(key)
-            break
 
         for key in expired_keys:
             self._cache.pop(key, None)  # type: ignore
             self._expiration.pop(key, None)
+
+        return len(expired_keys)
 
     async def setup(self):
         pass

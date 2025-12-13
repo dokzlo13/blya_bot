@@ -1,9 +1,11 @@
 from dataclasses import dataclass
 from enum import Enum, auto
+from itertools import product
 from pathlib import Path
-from typing import Generator, List, Optional
+from typing import Generator
 
-from .entry import DictEntry, DictEntryFlags
+from blya_bot.dictionary.entry import DictEntry, DictEntryFlags
+
 from .interface import IDictionaryLoader
 
 
@@ -24,16 +26,16 @@ class LiteralNode(Node):
 @dataclass
 class GroupNode(Node):
     group_type: GroupType
-    options: List[List[Node]]  # Each option is a list of Nodes
+    options: list[list[Node]]  # Each option is a list of Nodes
 
 
 class DslFileDict(IDictionaryLoader):
-    def __init__(self, group_separator="|", equal_chars: list[tuple[str, str]] | None = None):
+    def __init__(self, group_separator: str = "|", equal_chars: list[tuple[str, str]] | None = None) -> None:
         self.group_separator = group_separator
         self.equal_chars = equal_chars or []
 
-    def load(self, file_path: Path) -> List[DictEntry]:
-        entries: List[DictEntry] = []
+    def load(self, file_path: Path) -> list[DictEntry]:
+        entries: list[DictEntry] = []
         with file_path.open("r", encoding="utf-8") as file:
             for line in file:
                 line = line.strip()
@@ -60,7 +62,7 @@ class DslFileDict(IDictionaryLoader):
             line = line.replace("^", "")
 
         # Expand the line into words
-        def expand_line(line: str):
+        def expand_line(line: str) -> Generator[DictEntry, None, None]:
             for word in self.expand(line):
                 if word == original_line:
                     yield DictEntry(word=word, flags=flags, parent=None)
@@ -77,18 +79,17 @@ class DslFileDict(IDictionaryLoader):
                     for other_char in to_add:
                         yield from expand_line(line.replace(char, other_char))
 
-    def expand(self, s: str) -> List[str]:
+    def expand(self, s: str) -> list[str]:
         # Parse the input string into a nested structure of Nodes
         nodes = self.parse(s)
         # Generate all combinations from the parsed structure
-        expansions = self.generate(nodes)
-        return expansions
+        return self.generate(nodes)
 
-    def parse(self, s: str) -> List[Node]:
+    def parse(self, s: str) -> list[Node]:
         index = 0
         length = len(s)
 
-        def parse_node(index: int, terminators: Optional[set] = None) -> tuple[List[Node], int]:
+        def parse_node(index: int, terminators: set[str] | None = None) -> tuple[list[Node], int]:
             if terminators is None:
                 terminators = set()
             nodes: list[Node] = []
@@ -96,7 +97,7 @@ class DslFileDict(IDictionaryLoader):
                 c = s[index]
                 if c in terminators:
                     break  # Return to the caller when terminator is found
-                elif c == "[" or c == "{":
+                elif c in ("[", "{"):
                     group_type = GroupType.OPTIONAL if c == "[" else GroupType.MANDATORY
                     index += 1  # Skip the opening bracket
                     options, index = parse_group(index, group_type)
@@ -116,8 +117,8 @@ class DslFileDict(IDictionaryLoader):
                         index += 1
             return nodes, index
 
-        def parse_group(index: int, group_type: GroupType) -> tuple[List[Node], int]:
-            options: list[Node] = []
+        def parse_group(index: int, group_type: GroupType) -> tuple[list[list[Node]], int]:
+            options: list[list[Node]] = []
             closing_bracket = "]" if group_type == GroupType.OPTIONAL else "}"
             terminators = {self.group_separator, closing_bracket}
             while index < length:
@@ -134,7 +135,8 @@ class DslFileDict(IDictionaryLoader):
                     else:
                         raise ValueError(f"Unexpected character '{c}' at position {index}")
                 else:
-                    raise ValueError(f"Unmatched '{'[' if group_type == GroupType.OPTIONAL else '{'}' in string: {s}")
+                    bracket = "[" if group_type == GroupType.OPTIONAL else "{"
+                    raise ValueError(f"Unmatched '{bracket}' in string: {s}")
             return options, index
 
         nodes, index = parse_node(index)
@@ -142,13 +144,11 @@ class DslFileDict(IDictionaryLoader):
             raise ValueError(f"Unexpected character '{s[index]}' at position {index}")
         return nodes
 
-    def generate(self, nodes: List[Node]) -> List[str]:
-        from itertools import product
-
+    def generate(self, nodes: list[Node]) -> list[str]:
         if not nodes:
             return [""]
 
-        def expand_nodes(node_list: List[Node]) -> List[str]:
+        def expand_nodes(node_list: list[Node]) -> list[str]:
             results = [""]
             for node in node_list:
                 if isinstance(node, LiteralNode):
@@ -169,3 +169,4 @@ class DslFileDict(IDictionaryLoader):
             return results
 
         return expand_nodes(nodes)
+
