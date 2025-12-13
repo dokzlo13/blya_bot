@@ -21,7 +21,7 @@ dependencies = [
 [project.optional-dependencies]
 pywhispercpp = ["pywhispercpp>=1.2.0"]
 faster-whisper = ["faster-whisper>=1.0.3"]
-vosk = ["vosk>=0.3.43", "pydub>=0.25.1"]
+vosk = ["vosk>=0.3.43"]
 
 [dependency-groups]
 dev = [

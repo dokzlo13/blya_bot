@@ -2,8 +2,7 @@ import asyncio
 import io
 import json
 import wave
-from concurrent.futures import ThreadPoolExecutor
-from typing import Generator
+from collections.abc import Generator
 
 import structlog
 
@@ -13,7 +12,6 @@ from .utils import async_wrap_iter
 logger = structlog.getLogger(__name__)
 
 try:
-    import pydub
     import vosk
 except ImportError:
     logger.error("'vosk' recognition core dependencies not installed")
@@ -21,23 +19,39 @@ except ImportError:
 
 
 async def convert_audio_async(input_buf: io.IOBase) -> io.BytesIO:
-    loop = asyncio.get_event_loop()
+    """Convert audio to mono 16-bit WAV format using ffmpeg.
 
-    # Define the blocking task as a helper function
-    def convert_audio(input_buf: io.IOBase) -> io.BytesIO:
-        input_buf.seek(0)
-        audio: pydub.AudioSegment = pydub.AudioSegment.from_file(input_buf)
-        audio = audio.set_channels(1)
-        audio = audio.set_sample_width(2)
+    Args:
+        input_buf: Input audio buffer in any format supported by ffmpeg.
 
-        wav_buf = io.BytesIO()
-        audio.export(format="wav", out_f=wav_buf)
-        wav_buf.seek(0)
-        return wav_buf
+    Returns:
+        BytesIO buffer containing WAV audio data.
 
-    # Run the blocking code in a separate thread
-    with ThreadPoolExecutor() as pool:
-        return await loop.run_in_executor(pool, convert_audio, input_buf)
+    Raises:
+        RuntimeError: If ffmpeg conversion fails.
+    """
+    proc = await asyncio.create_subprocess_exec(
+        "ffmpeg",
+        "-i", "pipe:0",        # Read from stdin
+        "-ac", "1",            # Mono channel
+        "-ar", "16000",        # 16kHz sample rate (standard for speech recognition)
+        "-sample_fmt", "s16",  # 16-bit signed
+        "-f", "wav",           # Output format
+        "pipe:1",              # Write to stdout
+        stdin=asyncio.subprocess.PIPE,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    input_buf.seek(0)
+    stdout, stderr = await proc.communicate(input_buf.read())
+
+    if proc.returncode != 0:
+        error_msg = stderr.decode() if stderr else "Unknown error"
+        logger.error("ffmpeg conversion failed", returncode=proc.returncode, stderr=error_msg)
+        raise RuntimeError(f"ffmpeg conversion failed: {error_msg}")
+
+    return io.BytesIO(stdout)
 
 
 class VoskSpeechRecognizer(BaseSpeechRecognizer):
